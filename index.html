@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IA Chat — Entrar</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f0f;--card:#171717;--border:#2a2a2a;--input:#1e1e1e;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px 32px;width:100%;max-width:400px}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center}
+.logo-icon{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.logo-text{font-size:18px;font-weight:600}
+.tabs{display:flex;background:var(--input);border-radius:10px;padding:3px;margin-bottom:24px;gap:3px}
+.tab{flex:1;padding:8px;border-radius:7px;border:none;background:none;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.tab.active{background:var(--card);color:var(--text)}
+.form{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:12px;color:var(--muted)}
+input{background:var(--input);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .2s}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+.btn{background:var(--accent);border:none;border-radius:10px;padding:12px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;margin-top:4px}
+.btn:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:#fca5a5;display:none}
+.err.show{display:block}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><div class="logo-icon">🤖</div><span class="logo-text">IA Chat</span></div>
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('login')">Entrar</button>
+    <button class="tab" onclick="setTab('register')">Criar conta</button>
+  </div>
+  <div class="err" id="err"></div>
+  <div id="loginForm" class="form">
+    <div class="field"><label>Email</label><input type="email" id="lEmail" placeholder="seu@email.com"/></div>
+    <div class="field"><label>Senha</label><input type="password" id="lPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <button class="btn" id="lBtn" onclick="doLogin()">Entrar</button>
+  </div>
+  <div id="regForm" class="form" style="display:none">
+    <div class="field"><label>Email</label><input type="email" id="rEmail" placeholder="seu@email.com"/></div>
+    <div class="field"><label>Senha</label><input type="password" id="rPass" placeholder="mínimo 6 caracteres"/></div>
+    <div class="field"><label>Confirmar senha</label><input type="password" id="rPass2" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()"/></div>
+    <button class="btn" id="rBtn" onclick="doRegister()">Criar conta</button>
+  </div>
+</div>
+<script>
+function setTab(t){
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='login')||(i===1&&t==='register')));
+  document.getElementById('loginForm').style.display=t==='login'?'flex':'none';
+  document.getElementById('regForm').style.display=t==='register'?'flex':'none';
+  showErr('');
+}
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.toggle('show',!!m);}
+async function doLogin(){
+  const email=document.getElementById('lEmail').value.trim();
+  const password=document.getElementById('lPass').value;
+  if(!email||!password)return showErr('Preencha todos os campos.');
+  const btn=document.getElementById('lBtn');btn.disabled=true;btn.textContent='Entrando...';
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d=await r.json();
+    if(!r.ok)return showErr(d.error);
+    window.location.href=d.user.role==='user'?'/chat.html':'/admin.html';
+  }catch{showErr('Erro de conexão.');}
+  finally{btn.disabled=false;btn.textContent='Entrar';}
+}
+async function doRegister(){
+  const email=document.getElementById('rEmail').value.trim();
+  const password=document.getElementById('rPass').value;
+  const p2=document.getElementById('rPass2').value;
+  if(!email||!password||!p2)return showErr('Preencha todos os campos.');
+  if(password!==p2)return showErr('As senhas não coincidem.');
+  const btn=document.getElementById('rBtn');btn.disabled=true;btn.textContent='Criando...';
+  try{
+    const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d=await r.json();
+    if(!r.ok)return showErr(d.error);
+    window.location.href='/chat.html';
+  }catch{showErr('Erro de conexão.');}
+  finally{btn.disabled=false;btn.textContent='Criar conta';}
+}
+fetch('/api/me').then(r=>r.json()).then(d=>{if(d.email)window.location.href=d.role==='user'?'/chat.html':'/admin.html';}).catch(()=>{});
+</script>
+</body>
+</html>
