@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IA Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --sidebar: #171717;
+    --surface: #1e1e1e;
+    --border: #2a2a2a;
+    --input-bg: #2f2f2f;
+    --text: #ececec;
+    --muted: #8e8ea0;
+    --accent: #19c37d;
+    --accent-blue: #4f8ef7;
+  }
+
+  html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; }
+
+  .layout { display: flex; height: 100vh; overflow: hidden; }
+
+  /* Sidebar */
+  .sidebar { width: 260px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 12px 8px; gap: 4px; flex-shrink: 0; }
+
+  .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 8px 10px 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+
+  .sidebar-logo { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+
+  .sidebar-title { font-size: 15px; font-weight: 600; }
+
+  .new-chat-btn { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer; transition: background 0.15s; width: 100%; text-align: left; }
+  .new-chat-btn:hover { background: var(--surface); }
+
+  .sidebar-section { font-size: 11px; font-weight: 500; color: var(--muted); padding: 10px 12px 4px; text-transform: uppercase; letter-spacing: 0.6px; }
+
+  .provider-group { padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+
+  .provider-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.15s; border: none; background: none; font-family: 'Inter', sans-serif; width: 100%; text-align: left; }
+  .provider-item:hover { background: var(--surface); color: var(--text); }
+  .provider-item.active { background: var(--surface); color: var(--text); }
+
+  .pdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pdot.groq { background: var(--accent); }
+  .pdot.gemini { background: var(--accent-blue); }
+
+  .model-wrap { padding: 4px 8px; }
+  .model-select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; outline: none; cursor: pointer; }
+
+  .api-wrap { padding: 4px 8px; margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .api-label { font-size: 11px; color: var(--muted); padding: 0 4px; }
+
+  .api-field { position: relative; }
+  .api-field input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 32px 8px 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; outline: none; transition: border-color 0.2s; }
+  .api-field input:focus { border-color: var(--accent); }
+  .api-field input::placeholder { color: var(--muted); font-size: 11px; }
+
+  .api-vis { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px; }
+  .api-vis:hover { color: var(--text); }
+
+  .get-key { font-size: 11px; color: var(--accent); text-decoration: none; padding: 0 4px; }
+  .get-key:hover { opacity: 0.7; }
+
+  .persona-btn { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.15s; width: 100%; text-align: left; margin-top: 2px; }
+  .persona-btn:hover { background: var(--surface); color: var(--text); }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  #messages { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  #messages::-webkit-scrollbar { width: 6px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Welcome */
+  .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; gap: 20px; padding: 40px 20px; text-align: center; animation: fadeUp 0.4s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+  .welcome h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; }
+  .welcome > p { font-size: 14px; color: var(--muted); max-width: 380px; }
+
+  .sug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 480px; width: 100%; margin-top: 8px; }
+
+  .sug-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; text-align: left; cursor: pointer; transition: all 0.15s; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .sug-card:hover { background: var(--input-bg); color: var(--text); border-color: #3a3a3a; }
+  .sug-card strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+
+  /* Messages */
+  .msg-row { padding: 18px 0; }
+  .msg-row:hover { background: rgba(255,255,255,0.01); }
+
+  .msg-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; display: flex; gap: 16px; align-items: flex-start; }
+
+  .msg-av { width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; margin-top: 2px; }
+  .msg-row.user .msg-av { background: #5436da; color: #fff; }
+  .msg-row.ai .msg-av { background: var(--accent); color: #000; }
+
+  .msg-body { flex: 1; font-size: 15px; line-height: 1.75; color: var(--text); min-width: 0; }
+  .msg-body p { margin-bottom: 10px; }
+  .msg-body p:last-child { margin-bottom: 0; }
+  .msg-body pre { background: #161616; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; margin: 10px 0; }
+  .msg-body code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px; }
+  .msg-body pre code { background: none; padding: 0; }
+  .msg-body ul, .msg-body ol { padding-left: 20px; margin: 8px 0; }
+  .msg-body li { margin-bottom: 4px; }
+  .msg-body strong { font-weight: 600; }
+
+  /* Typing */
+  .typing-row { padding: 18px 0; }
+  .typing-inner { max-width: 680px; margin: 0 auto; padding: 0 24px; display: flex; gap: 16px; align-items: center; }
+  .tdots { display: flex; gap: 4px; }
+  .tdots span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: td 1.2s ease-in-out infinite; }
+  .tdots span:nth-child(2) { animation-delay: 0.2s; }
+  .tdots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes td { 0%,60%,100% { opacity:0.3; transform:translateY(0); } 30% { opacity:1; transform:translateY(-4px); } }
+
+  /* Input */
+  .input-area { padding: 16px 24px 24px; background: var(--bg); }
+  .input-box { max-width: 680px; margin: 0 auto; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; transition: border-color 0.2s; }
+  .input-box:focus-within { border-color: #4a4a4a; }
+
+  #userInput { flex: 1; background: none; border: none; outline: none; color: var(--text); font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.6; resize: none; max-height: 200px; padding: 2px 0; }
+  #userInput::placeholder { color: var(--muted); }
+
+  #sendBtn { width: 32px; height: 32px; border-radius: 8px; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+  #sendBtn:hover { filter: brightness(1.1); }
+  #sendBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+  #sendBtn svg { width: 15px; height: 15px; fill: #000; }
+
+  .input-hint { max-width: 680px; margin: 6px auto 0; font-size: 11px; color: var(--muted); text-align: center; }
+
+  /* Mobile */
+  .mob-header { display: none; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--sidebar); }
+  .mob-menu { background: none; border: none; color: var(--text); font-size: 18px; cursor: pointer; line-height: 1; padding: 4px; }
+
+  @media (max-width: 640px) {
+    .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; z-index: 100; transition: left 0.25s ease; }
+    .sidebar.open { left: 0; }
+    .mob-header { display: flex; }
+    .sug-grid { grid-template-columns: 1fr; }
+    .msg-inner, .typing-inner { padding: 0 16px; }
+    .input-area { padding: 12px 16px 20px; }
+  }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--sidebar); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 500px; animation: mIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes mIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .modal > p { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+  .preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .preset { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; color: var(--muted); cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.15s; }
+  .preset:hover { border-color: var(--accent); color: var(--text); }
+  .modal textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 13px; resize: vertical; min-height: 100px; outline: none; line-height: 1.6; transition: border-color 0.2s; }
+  .modal textarea:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .btn-cancel { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; color: var(--muted); font-family: 'Inter', sans-serif; font-size: 13px; cursor: pointer; }
+  .btn-cancel:hover { color: var(--text); }
+  .btn-save { background: var(--accent); border: none; border-radius: 8px; padding: 8px 18px; color: #000; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-save:hover { filter: brightness(1.1); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🤖</div>
+      <span class="sidebar-title">IA Chat</span>
+    </div>
+
+    <button class="new-chat-btn" onclick="newChat()">✏️ &nbsp;Nova conversa</button>
+
+    <div class="sidebar-section">Provedor</div>
+    <div class="provider-group">
+      <button class="provider-item active" id="btn-groq" onclick="setProvider('groq')">
+        <div class="pdot groq"></div> Groq
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)">LLaMA</span>
+      </button>
+      <button class="provider-item" id="btn-gemini" onclick="setProvider('gemini')">
+        <div class="pdot gemini"></div> Gemini
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)">Flash</span>
+      </button>
+    </div>
+
+    <div class="sidebar-section">Modelo</div>
+    <div class="model-wrap">
+      <select class="model-select" id="modelSelect" onchange="model=this.value">
+        <option value="llama-3.3-70b-versatile">LLaMA 3.3 70B</option>
+        <option value="llama-3.1-8b-instant">LLaMA 3.1 8B (rápido)</option>
+        <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+        <option value="gemma2-9b-it">Gemma 2 9B</option>
+      </select>
+    </div>
+
+    <div class="api-wrap">
+      <div class="api-label" id="apiLabel">API Key — Groq</div>
+      <div class="api-field">
+        <input type="password" id="apiKey" placeholder="gsk_..." />
+        <button class="api-vis" onclick="toggleVis()">👁</button>
+      </div>
+      <a href="https://console.groq.com/keys" id="keyLink" target="_blank" class="get-key">→ Obter key grátis</a>
+      <button class="persona-btn" onclick="openModal()">⚙️ &nbsp;Personalidade da IA</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="mob-header">
+      <button class="mob-menu" onclick="toggleSidebar()">☰</button>
+      <span style="font-size:14px;font-weight:600;">IA Chat</span>
+    </div>
+
+    <div id="messages">
+      <div class="welcome" id="welcome">
+        <h1>Como posso ajudar?</h1>
+        <p>Configure sua API key no painel lateral e comece a conversar.</p>
+        <div class="sug-grid">
+          <div class="sug-card" onclick="suggest('Me explique como funciona a inteligência artificial de forma simples')">
+            <strong>Aprenda algo novo</strong>Como funciona a inteligência artificial?
+          </div>
+          <div class="sug-card" onclick="suggest('Crie um script Python para automação de tarefas')">
+            <strong>Escreva código</strong>Script Python para automação
+          </div>
+          <div class="sug-card" onclick="suggest('Me ajuda a criar um bot para WhatsApp com Node.js')">
+            <strong>Desenvolva um projeto</strong>Bot para WhatsApp com Node.js
+          </div>
+          <div class="sug-card" onclick="suggest('Quais são as melhores práticas de segurança para APIs REST?')">
+            <strong>Segurança</strong>Boas práticas para APIs
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-box">
+        <textarea id="userInput" placeholder="Envie uma mensagem..." rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button id="sendBtn" onclick="send()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter para enviar · Shift+Enter para nova linha</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modalBg" onclick="closeOut(event)">
+  <div class="modal">
+    <h3>Personalidade da IA</h3>
+    <p>Defina como a IA deve se comportar. Use os presets ou escreva o seu.</p>
+    <div class="preset-row">
+      <div class="preset" onclick="applyPreset('geral')">Geral</div>
+      <div class="preset" onclick="applyPreset('dev')">Dev Sênior</div>
+      <div class="preset" onclick="applyPreset('criativo')">Criativo</div>
+      <div class="preset" onclick="applyPreset('direto')">Direto</div>
+      <div class="preset" onclick="applyPreset('professor')">Professor</div>
+    </div>
+    <textarea id="sysInput"></textarea>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-save" onclick="savePersona()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let provider = 'groq';
+let model = 'llama-3.3-70b-versatile';
+let history = [];
+let loading = false;
+let systemPrompt = "Você é uma inteligência artificial avançada e prestativa. Responda sempre em português brasileiro, de forma clara, direta e útil.";
+
+const groqModels = [
+  { v: 'llama-3.3-70b-versatile', l: 'LLaMA 3.3 70B' },
+  { v: 'llama-3.1-8b-instant', l: 'LLaMA 3.1 8B (rápido)' },
+  { v: 'mixtral-8x7b-32768', l: 'Mixtral 8x7B' },
+  { v: 'gemma2-9b-it', l: 'Gemma 2 9B' },
+];
+
+const geminiModels = [
+  { v: 'gemini-1.5-flash', l: 'Gemini 1.5 Flash' },
+  { v: 'gemini-1.5-flash-8b', l: 'Gemini 1.5 Flash 8B' },
+  { v: 'gemini-1.5-pro', l: 'Gemini 1.5 Pro' },
+];
+
+const presets = {
+  geral: "Você é uma inteligência artificial avançada e prestativa. Responda sempre em português brasileiro, de forma clara, direta e útil.",
+  dev: "Você é um desenvolvedor sênior full-stack com 15 anos de experiência em JavaScript, Python, Node.js e React. Responda em português, seja técnico e forneça código funcional e bem comentado.",
+  criativo: "Você é uma IA criativa. Escreva com imaginação, use metáforas e seja expressivo. Responda em português com entusiasmo.",
+  direto: "Responda em português de forma direta e concisa. Sem rodeios. Vá ao ponto.",
+  professor: "Você é um professor paciente e didático. Explique conceitos de forma simples com exemplos práticos. Responda sempre em português.",
+};
+
+function setProvider(p) {
+  provider = p;
+  history = [];
+  document.getElementById('btn-groq').classList.toggle('active', p === 'groq');
+  document.getElementById('btn-gemini').classList.toggle('active', p === 'gemini');
+  const models = p === 'groq' ? groqModels : geminiModels;
+  const sel = document.getElementById('modelSelect');
+  sel.innerHTML = models.map(m => `<option value="${m.v}">${m.l}</option>`).join('');
+  model = models[0].v;
+  document.getElementById('apiLabel').textContent = `API Key — ${p === 'groq' ? 'Groq' : 'Gemini'}`;
+  document.getElementById('keyLink').href = p === 'groq' ? 'https://console.groq.com/keys' : 'https://aistudio.google.com/app/apikey';
+  document.getElementById('keyLink').textContent = `→ Obter key grátis`;
+  document.getElementById('apiKey').placeholder = p === 'groq' ? 'gsk_...' : 'AIzaSy...';
+  document.getElementById('apiKey').value = '';
+}
+
+function toggleVis() {
+  const i = document.getElementById('apiKey');
+  i.type = i.type === 'password' ? 'text' : 'password';
+}
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+}
+
+function suggest(text) {
+  document.getElementById('userInput').value = text;
+  send();
+}
+
+function newChat() {
+  history = [];
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const w = document.createElement('div');
+  w.className = 'welcome'; w.id = 'welcome';
+  w.innerHTML = `<h1>Como posso ajudar?</h1><p style="color:var(--muted);font-size:14px;">Nova conversa iniciada.</p>`;
+  msgs.appendChild(w);
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+async function send() {
+  if (loading) return;
+  const input = document.getElementById('userInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) {
+    alert(`Cole sua API key do ${provider === 'groq' ? 'Groq' : 'Google Gemini'} no painel lateral.`);
+    return;
+  }
+
+  document.getElementById('welcome')?.remove();
+  document.getElementById('sidebar').classList.remove('open');
+
+  addMsg('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+  history.push({ role: 'user', content: text });
+
+  const tid = showTyping();
+  loading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const reply = provider === 'groq' ? await callGroq(apiKey) : await callGemini(apiKey);
+    document.getElementById(tid)?.remove();
+    addMsg('ai', reply);
+    history.push({ role: 'assistant', content: reply });
+  } catch (err) {
+    document.getElementById(tid)?.remove();
+    addMsg('ai', `❌ Erro: ${err.message}`);
+    history.pop();
+  }
+
+  loading = false;
+  document.getElementById('sendBtn').disabled = false;
+  input.focus();
+}
+
+async function callGroq(apiKey) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: systemPrompt }, ...history],
+      max_tokens: 2048,
+      temperature: 0.7
+    })
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Erro HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || 'Sem resposta.';
+}
+
+async function callGemini(apiKey) {
+  const contents = history.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { maxOutputTokens: 2048, temperature: 0.7 }
+      })
+    }
+  );
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Erro HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Resposta vazia da API Gemini.');
+  return text;
+}
+
+function addMsg(role, text) {
+  const c = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
+  const av = role === 'user' ? 'EU' : 'IA';
+  row.innerHTML = `<div class="msg-inner"><div class="msg-av">${av}</div><div class="msg-body">${fmt(text)}</div></div>`;
+  c.appendChild(row);
+  c.scrollTop = c.scrollHeight;
+}
+
+function fmt(text) {
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, l, code) => {
+    const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').trim();
+    return `<pre><code>${esc}</code></pre>`;
+  });
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  text = text.replace(/^[\-\*] (.+)/gm, '<li>$1</li>');
+  text = text.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>');
+  return text.split(/\n{2,}/).map(p => {
+    p = p.trim();
+    if (!p) return '';
+    if (p.startsWith('<pre>') || p.startsWith('<ul>')) return p;
+    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+}
+
+function showTyping() {
+  const c = document.getElementById('messages');
+  const d = document.createElement('div');
+  const id = 'tp' + Date.now();
+  d.id = id; d.className = 'typing-row';
+  d.innerHTML = `<div class="typing-inner"><div class="msg-av" style="background:var(--accent);color:#000;width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;">IA</div><div class="tdots"><span></span><span></span><span></span></div></div>`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+  return id;
+}
+
+function openModal() { document.getElementById('sysInput').value = systemPrompt; document.getElementById('modalBg').classList.add('show'); }
+function closeModal() { document.getElementById('modalBg').classList.remove('show'); }
+function closeOut(e) { if (e.target === document.getElementById('modalBg')) closeModal(); }
+function applyPreset(k) { document.getElementById('sysInput').value = presets[k]; }
+function savePersona() { const v = document.getElementById('sysInput').value.trim(); if (v) systemPrompt = v; history = []; closeModal(); }
+
+document.getElementById('sysInput').value = systemPrompt;
+</script>
+</body>
+</html>
