@@ -13,7 +13,7 @@ const mailer = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER || 'nexiasuporte646@gmail.com',
-    pass: process.env.GMAIL_PASS || 'czpa ynuw yuli zzud'
+    pass: process.env.GMAIL_PASS || 'czpaynuwyulizzud'
   }
 });
 
