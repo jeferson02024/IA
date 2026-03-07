@@ -6,7 +6,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0f0f0f;--card:#171717;--surface:#1e1e1e;--border:#2a2a2a;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#4f8ef7;--purple:#c084fc;--orange:#fb923c}
+:root{--bg:#0f0f0f;--card:#171717;--surface:#1e1e1e;--border:#2a2a2a;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#4f8ef7;--purple:#c084fc;--orange:#fb923c;--mistral:#ff7000}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
 header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
 header h1{font-size:16px;font-weight:600}
@@ -46,7 +46,7 @@ header h1{font-size:16px;font-weight:600}
 .pill-dot.model{background:var(--purple)}
 .pill-count{color:var(--muted);font-size:11px}
 /* API cards */
-.api-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.api-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
 .api-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
 .api-card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .api-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -110,7 +110,7 @@ input::placeholder{color:var(--muted)}
 .btn-cancel{background:none;border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer}
 .btn-primary{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:640px){.api-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}}
+@media(max-width:800px){.api-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -208,6 +208,26 @@ input::placeholder{color:var(--muted)}
         </div>
         <div class="field"><label>API Key</label><input type="password" id="geminiKeyInput" placeholder="Cole a key do Gemini..."/></div>
         <button class="btn-gemini" onclick="saveGemini()">Salvar Gemini</button>
+      </div>
+
+      <!-- Mistral -->
+      <div class="api-card" style="border-color:rgba(255,112,0,.2)">
+        <div class="api-card-header">
+          <div class="api-icon" style="background:rgba(255,112,0,.15)">🔥</div>
+          <div><div class="api-card-title">Mistral AI</div><div class="api-card-sub">Mistral · Gratuito</div></div>
+        </div>
+        <div class="key-status"><div class="kdot" id="mistralDot" style="background:#333"></div><span id="mistralInfo">Verificando...</span></div>
+        <div class="field">
+          <label>Modelo padrão</label>
+          <select id="mistralModel">
+            <option value="mistral-large-latest">Mistral Large</option>
+            <option value="mistral-small-latest">Mistral Small</option>
+            <option value="codestral-latest">Codestral</option>
+            <option value="open-mistral-7b">Mistral 7B</option>
+          </select>
+        </div>
+        <div class="field"><label>API Key (api_...)</label><input type="password" id="mistralKeyInput" placeholder="Cole a key do Mistral..."/></div>
+        <button style="background:#ff7000;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveMistral()">Salvar Mistral</button>
       </div>
     </div>
   </div>
@@ -315,6 +335,13 @@ async function loadConfig() {
   document.getElementById('geminiInfo').textContent = d.hasGeminiKey ? `✅ ${d.geminiKeyMasked}` : 'Nenhuma key configurada';
   if (d.groqModel) document.getElementById('groqModel').value = d.groqModel;
   if (d.geminiModel) document.getElementById('geminiModel').value = d.geminiModel;
+  const mDot = document.getElementById('mistralDot');
+  if (mDot) {
+    mDot.style.background = d.hasMistralKey ? '#ff7000' : '#333';
+    mDot.style.boxShadow = d.hasMistralKey ? '0 0 6px #ff7000' : 'none';
+    document.getElementById('mistralInfo').textContent = d.hasMistralKey ? '✅ '+d.mistralKeyMasked : 'Nenhuma key configurada';
+    if (d.mistralModel) document.getElementById('mistralModel').value = d.mistralModel;
+  }
 }
 
 async function saveGroq() {
@@ -325,6 +352,16 @@ async function saveGroq() {
   if (!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('groqKeyInput').value='';
   toast('✅ Key do Groq salva!','ok'); loadConfig();
+}
+
+async function saveMistral() {
+  const mistralKey = document.getElementById('mistralKeyInput').value.trim();
+  const mistralModel = document.getElementById('mistralModel').value;
+  if (!mistralKey) return toast('Cole a API key do Mistral.','err');
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mistralKey,mistralModel})});
+  if (!r.ok) return toast('Erro ao salvar.','err');
+  document.getElementById('mistralKeyInput').value='';
+  toast('✅ Key do Mistral salva!','ok'); loadConfig();
 }
 
 async function saveGemini() {

@@ -23,11 +23,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .provider-btn.active{background:var(--surface)}
 .provider-btn.active.groq{color:var(--accent)}
 .provider-btn.active.gemini{color:var(--blue)}
-.provider-btn.active.aiml{color:var(--purple)}
+.provider-btn.active.mistral{color:#ff7000}
 .pdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .pdot.groq{background:var(--accent)}
 .pdot.gemini{background:var(--blue)}
-.pdot.aiml{background:var(--purple)}
+.pdot.mistral{background:#ff7000}
 .provider-btn.active .pdot{box-shadow:0 0 6px currentColor}
 .model-wrap{padding:2px 12px 8px}
 .model-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;cursor:pointer}
@@ -40,7 +40,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .conv-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .conv-dot.groq{background:var(--accent)}
 .conv-dot.gemini{background:var(--blue)}
-.conv-dot.aiml{background:var(--purple)}
+.conv-dot.mistral{background:#ff7000}
 .conv-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .conv-del{display:none;background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:14px;border-radius:4px;flex-shrink:0}
 .conv-item:hover .conv-del{display:block}
@@ -72,7 +72,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .msg-row.user .msg-av{background:#5436da;color:#fff}
 .msg-row.ai .msg-av{background:var(--accent)}
 .msg-row.ai.gemini .msg-av{background:var(--blue)}
-.msg-row.ai.aiml .msg-av{background:var(--purple)}
+.msg-row.ai.mistral .msg-av{background:#ff7000}
 .msg-body{flex:1;font-size:15px;line-height:1.75;color:var(--text);min-width:0}
 .msg-body p{margin-bottom:10px}
 .msg-body p:last-child{margin-bottom:0}
@@ -135,6 +135,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .key-row{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px}
 .kdot{width:7px;height:7px;border-radius:50%;background:#444;flex-shrink:0}
 .kdot.on.groq{background:var(--accent)}
+.kdot.on.mistral{background:#ff7000}
 .kdot.on.gemini{background:var(--blue)}
 .kdot.on.aiml{background:var(--purple)}
 .modal-sep{height:1px;background:var(--border);margin:16px 0}
@@ -161,8 +162,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
         <button class="provider-btn gemini" id="btnGemini" onclick="setProvider('gemini')">
           <div class="pdot gemini"></div>Gemini<span style="margin-left:auto;font-size:10px;color:var(--muted)">Imagem</span>
         </button>
-        <button class="provider-btn aiml" id="btnAiml" onclick="setProvider('aiml')">
-          <div class="pdot aiml"></div>AIML<span style="margin-left:auto;font-size:10px;color:var(--muted)">Imagem+ZIP</span>
+        <button class="provider-btn mistral" id="btnMistral" onclick="setProvider('mistral')">
+          <div class="pdot mistral"></div>Mistral<span style="margin-left:auto;font-size:10px;color:var(--muted)">Rápido</span>
         </button>
       </div>
       <div class="model-wrap">
@@ -234,11 +235,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
       <button style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer" onclick="removeKey('gemini')">Remover</button>
     </div>
 
-    <div class="key-row"><div class="kdot aiml" id="aimlDot"></div><span id="aimlStatus" style="font-size:12px;color:var(--muted)">AIML: verificando...</span></div>
-    <div class="modal-field"><label>API Key do AIML API</label><input type="password" id="aimlKeyInput" placeholder="Cole sua key do AIML..."/></div>
+    <div class="key-row"><div class="kdot mistral" id="mistralDot"></div><span id="mistralStatus" style="font-size:12px;color:var(--muted)">Mistral: verificando...</span></div>
+    <div class="modal-field"><label>API Key do Mistral (api_...)</label><input type="password" id="mistralKeyInput" placeholder="Cole sua key do Mistral..."/></div>
     <div style="display:flex;gap:8px;margin-bottom:4px">
-      <button class="btn-save" style="flex:1;font-size:12px;padding:8px;background:var(--purple)" onclick="saveKey('aiml')">Salvar</button>
-      <button style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer" onclick="removeKey('aiml')">Remover</button>
+      <button class="btn-save" style="flex:1;font-size:12px;padding:8px;background:#ff7000" onclick="saveKey('mistral')">Salvar</button>
+      <button style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer" onclick="removeKey('mistral')">Remover</button>
     </div>
 
     <div class="modal-sep"></div>
@@ -264,14 +265,14 @@ let pendingFile=null; // {type:'image'|'text', ...}
 const models={
   groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama-3.2-90b-vision-preview','llama-3.2-11b-vision-preview','llama-guard-3-8b'],
   gemini:['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro'],
-  aiml:['meta-llama/Llama-Vision-Free','Qwen/Qwen2.5-VL-7B-Instruct','mistralai/Mistral-7B-Instruct-v0.2']
+  mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b']
 };
 
-const provColors={groq:'var(--accent)',gemini:'var(--blue)',aiml:'var(--purple)'};
+const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000'};
 
 function setProvider(p){
   provider=p;
-  ['groq','gemini','aiml'].forEach(x=>{
+  ['groq','gemini','mistral'].forEach(x=>{
     document.getElementById('btn'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===p);
   });
   const sel=document.getElementById('modelSelect');
@@ -280,8 +281,7 @@ function setProvider(p){
   document.getElementById('sendBtn').style.background=provColors[p];
   // ZIP/image hint
   const hint=document.querySelector('.input-hint');
-  if(p==='groq') hint.textContent='Enter para enviar · Shift+Enter para nova linha · 📎 apenas texto/ZIP';
-  else hint.textContent='Enter para enviar · Shift+Enter para nova linha · 📎 imagens e ZIP';
+  hint.textContent='Enter para enviar · Shift+Enter para nova linha';
 }
 
 async function init(){
@@ -379,10 +379,10 @@ function loadKeyStatus(){
   if(!me)return;
   document.getElementById('groqDot').classList.toggle('on',me.hasGroqKey);
   document.getElementById('geminiDot').classList.toggle('on',me.hasGeminiKey);
-  document.getElementById('aimlDot').classList.toggle('on',me.hasAimlKey);
+  document.getElementById('mistralDot').classList.toggle('on',me.hasMistralKey);
   document.getElementById('groqStatus').textContent=me.hasGroqKey?'Groq: ✅ key pessoal ativa':'Groq: usando key global';
   document.getElementById('geminiStatus').textContent=me.hasGeminiKey?'Gemini: ✅ key pessoal ativa':'Gemini: usando key global';
-  document.getElementById('aimlStatus').textContent=me.hasAimlKey?'AIML: ✅ key pessoal ativa':'AIML: usando key global';
+  document.getElementById('mistralStatus').textContent=me.hasMistralKey?'Mistral: ✅ key pessoal ativa':'Mistral: usando key global';
 }
 
 async function saveKey(type){
