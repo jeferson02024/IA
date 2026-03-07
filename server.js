@@ -26,6 +26,7 @@ async function initDB() {
   await q(`CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user', personal_groq_key TEXT, personal_gemini_key TEXT,
+    personal_mistral_key TEXT,
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
@@ -89,7 +90,7 @@ app.get('/api/me', auth, async (req,res) => {
   try {
     const r = await q('SELECT id,email,role,personal_groq_key,personal_gemini_key FROM users WHERE id=$1', [req.user.id]);
     const user = r.rows[0];
-    res.json({ id:user.id, email:user.email, role:user.role, hasGroqKey:!!user.personal_groq_key, hasGeminiKey:!!user.personal_gemini_key });
+    res.json({ id:user.id, email:user.email, role:user.role, hasGroqKey:!!user.personal_groq_key, hasGeminiKey:!!user.personal_gemini_key, hasMistralKey:!!user.personal_mistral_key });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
@@ -98,6 +99,8 @@ app.post('/api/my-key', auth, async (req,res) => {
     const {groqKey,geminiKey} = req.body;
     if (groqKey!==undefined) await q('UPDATE users SET personal_groq_key=$1 WHERE id=$2', [groqKey||null, req.user.id]);
     if (geminiKey!==undefined) await q('UPDATE users SET personal_gemini_key=$1 WHERE id=$2', [geminiKey||null, req.user.id]);
+    const {mistralKey} = req.body;
+    if (mistralKey!==undefined) await q('UPDATE users SET personal_mistral_key=$1 WHERE id=$2', [mistralKey||null, req.user.id]);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -159,13 +162,17 @@ app.post('/api/chat', auth, async (req,res) => {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_groq_key']);
       apiKey = userData?.personal_groq_key || ck.rows[0]?.value || process.env.GROQ_API_KEY;
       if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Groq configurada.' });
-    } else {
+    } else if (provider==='gemini') {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_gemini_key']);
       apiKey = userData?.personal_gemini_key || ck.rows[0]?.value || process.env.GEMINI_API_KEY;
       if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Gemini configurada.' });
+    } else {
+      const ck = await q('SELECT value FROM config WHERE key=$1', ['global_mistral_key']);
+      apiKey = userData?.personal_mistral_key || ck.rows[0]?.value || process.env.MISTRAL_API_KEY;
+      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Mistral configurada.' });
     }
-    const usedModel = model || (provider==='groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.0-flash');
-    const reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt) : await callGemini(apiKey, usedModel, messages, systemPrompt);
+    const usedModel = model || (provider==='groq' ? 'llama-3.3-70b-versatile' : provider==='gemini' ? 'gemini-2.0-flash' : 'mistral-large-latest');
+    const reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt) : provider==='gemini' ? await callGemini(apiKey, usedModel, messages, systemPrompt) : await callMistral(apiKey, usedModel, messages, systemPrompt);
     if (conversationId) {
       const cr = await q('SELECT * FROM conversations WHERE id=$1 AND user_id=$2', [conversationId, req.user.id]);
       if (cr.rows.length) {
@@ -187,6 +194,15 @@ async function callGroq(apiKey, model, messages, sys) {
     body: JSON.stringify({ model, messages:[{role:'system',content:sys||'Você é um assistente prestativo. Responda em português.'},...messages], max_tokens:2048, temperature:0.7 })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`Groq erro ${r.status}`); }
+  return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
+}
+
+async function callMistral(apiKey, model, messages, sys) {
+  const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body: JSON.stringify({ model, messages:[{role:'system',content:sys||'Você é um assistente prestativo. Responda em português.'},...messages], max_tokens:2048, temperature:0.7 })
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.message||`Mistral erro ${r.status}`); }
   return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
 }
 
@@ -232,12 +248,13 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
       groqKeyMasked: cfg.global_groq_key?cfg.global_groq_key.slice(0,8)+'••••':null, hasGroqKey:!!cfg.global_groq_key, groqModel:cfg.global_groq_model||'llama-3.3-70b-versatile',
       geminiKeyMasked: cfg.global_gemini_key?cfg.global_gemini_key.slice(0,8)+'••••':null, hasGeminiKey:!!cfg.global_gemini_key, geminiModel:cfg.global_gemini_model||'gemini-2.0-flash',
+      mistralKeyMasked: cfg.global_mistral_key?cfg.global_mistral_key.slice(0,8)+'••••':null, hasMistralKey:!!cfg.global_mistral_key, mistralModel:cfg.global_mistral_model||'mistral-large-latest',
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -250,6 +267,9 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (geminiKey) await upsert('global_gemini_key', geminiKey);
     if (groqModel) await upsert('global_groq_model', groqModel);
     if (geminiModel) await upsert('global_gemini_model', geminiModel);
+    const {mistralKey, mistralModel} = req.body;
+    if (mistralKey) await upsert('global_mistral_key', mistralKey);
+    if (mistralModel) await upsert('global_mistral_model', mistralModel);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
