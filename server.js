@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const Database = require('better-sqlite3');
 const path = require('path');
 
 const app = express();
@@ -10,75 +11,49 @@ const JWT_SECRET = process.env.JWT_SECRET || 'nexia-secret-2024';
 const CREATOR_EMAIL = process.env.CREATOR_EMAIL || 'jefersonrotello@gmail.com';
 const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
-// Supabase REST API
-const SB_URL = 'https://olbzdxculbwkdfkedekz.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sYnpkeGN1bGJ3a2Rma2VkZWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NDYwNDUsImV4cCI6MjA4ODQyMjA0NX0.CRTaKufSTrcK1tObM8ihXqhIClB-plhjWrwBK-c9-Bs';
-
-const sb = {
-  async query(table, method='GET', body=null, filters='') {
-    const url = `${SB_URL}/rest/v1/${table}${filters}`;
-    const opts = {
-      method,
-      headers: {
-        'apikey': SB_KEY,
-        'Authorization': `Bearer ${SB_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': method==='POST' ? 'return=representation' : method==='PATCH' ? 'return=representation' : '',
-      }
-    };
-    if (body) opts.body = JSON.stringify(body);
-    const r = await fetch(url, opts);
-    if (method==='DELETE') return [];
-    const text = await r.text();
-    if (!text) return [];
-    return JSON.parse(text);
-  },
-  async get(table, filters='') { return this.query(table,'GET',null,filters); },
-  async insert(table, body) { return this.query(table,'POST',body); },
-  async update(table, body, filters) { return this.query(table,'PATCH',body,filters); },
-  async delete(table, filters) { return this.query(table,'DELETE',null,filters); },
-};
-
 app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Init: criar tabelas via SQL RPC ──────────────────────────────────────────
-async function initDB() {
-  const sql = async (query) => {
-    const r = await fetch(`${SB_URL}/rest/v1/rpc/exec_sql`, {
-      method: 'POST',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-    return r;
-  };
+const db = new Database('/tmp/nexia.db');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user',
+    personal_groq_key TEXT,
+    personal_gemini_key TEXT,
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+  );
+  CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT);
+  CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL DEFAULT 'Nova conversa',
+    provider TEXT NOT NULL DEFAULT 'groq',
+    model TEXT NOT NULL DEFAULT 'llama-3.3-70b-versatile',
+    messages TEXT NOT NULL DEFAULT '[]',
+    updated_at INTEGER DEFAULT (strftime('%s','now')),
+    created_at INTEGER DEFAULT (strftime('%s','now'))
+  );
+`);
 
-  // Criar tabelas direto pelo Supabase dashboard já foi feito, então só verificamos o criador
-  try {
-    const users = await sb.get('users', `?email=eq.${encodeURIComponent(CREATOR_EMAIL)}`);
-    if (!users.length) {
-      const pwd = process.env.CREATOR_PASSWORD || 'trocar123';
-      await sb.insert('users', { email: CREATOR_EMAIL, password: bcrypt.hashSync(pwd,10), role: 'creator' });
-      console.log('✅ Criador criado');
-    }
-
-    // Seed env keys
-    if (process.env.GROQ_API_KEY) {
-      const ex = await sb.get('config', `?key=eq.global_groq_key`);
-      if (!ex.length) await sb.insert('config', { key:'global_groq_key', value: process.env.GROQ_API_KEY });
-    }
-    if (process.env.GEMINI_API_KEY) {
-      const ex = await sb.get('config', `?key=eq.global_gemini_key`);
-      if (!ex.length) await sb.insert('config', { key:'global_gemini_key', value: process.env.GEMINI_API_KEY });
-    }
-    console.log('✅ Supabase conectado!');
-  } catch(e) {
-    console.error('Erro init:', e.message);
+function ensureCreator() {
+  const pwd = process.env.CREATOR_PASSWORD || 'trocar123';
+  if (!db.prepare('SELECT id FROM users WHERE email=?').get(CREATOR_EMAIL)) {
+    db.prepare('INSERT INTO users (email,password,role) VALUES (?,?,?)').run(CREATOR_EMAIL, bcrypt.hashSync(pwd,10), 'creator');
+    console.log('✅ Criador criado');
   }
 }
+ensureCreator();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+function seedEnvKeys() {
+  if (process.env.GROQ_API_KEY) db.prepare('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)').run('global_groq_key', process.env.GROQ_API_KEY);
+  if (process.env.GEMINI_API_KEY) db.prepare('INSERT OR IGNORE INTO config (key,value) VALUES (?,?)').run('global_gemini_key', process.env.GEMINI_API_KEY);
+}
+seedEnvKeys();
+
 function signToken(u) { return jwt.sign({ id:u.id, email:u.email, role:u.role }, JWT_SECRET, { expiresIn:'7d' }); }
 function auth(req,res,next) {
   const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ','');
@@ -90,242 +65,169 @@ function role(...roles) {
   return (req,res,next) => { if (!roles.includes(req.user.role)) return res.status(403).json({ error:'Acesso negado.' }); next(); };
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-app.post('/api/register', async (req,res) => {
-  try {
-    const {email,password} = req.body;
-    if (!email||!password) return res.status(400).json({ error:'Email e senha obrigatórios.' });
-    if (password.length<6) return res.status(400).json({ error:'Senha mínima: 6 caracteres.' });
-    const ex = await sb.get('users', `?email=eq.${encodeURIComponent(email.toLowerCase())}`);
-    if (ex.length) return res.status(400).json({ error:'Email já cadastrado.' });
-    const rows = await sb.insert('users', { email:email.toLowerCase(), password:bcrypt.hashSync(password,10), role:'user' });
-    const user = rows[0];
-    res.cookie('token', signToken(user), { httpOnly:true, maxAge:7*24*60*60*1000 });
-    res.json({ ok:true, user:{ email:user.email, role:user.role } });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/register', (req,res) => {
+  const {email,password} = req.body;
+  if (!email||!password) return res.status(400).json({ error:'Email e senha obrigatórios.' });
+  if (password.length<6) return res.status(400).json({ error:'Senha mínima: 6 caracteres.' });
+  if (db.prepare('SELECT id FROM users WHERE email=?').get(email.toLowerCase())) return res.status(400).json({ error:'Email já cadastrado.' });
+  const r = db.prepare('INSERT INTO users (email,password,role) VALUES (?,?,?)').run(email.toLowerCase(), bcrypt.hashSync(password,10), 'user');
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(r.lastInsertRowid);
+  res.cookie('token', signToken(user), { httpOnly:true, maxAge:7*24*60*60*1000 });
+  res.json({ ok:true, user:{ email:user.email, role:user.role } });
 });
 
-app.post('/api/login', async (req,res) => {
-  try {
-    const {email,password} = req.body;
-    const rows = await sb.get('users', `?email=eq.${encodeURIComponent((email||'').toLowerCase())}`);
-    const user = rows[0];
-    if (!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({ error:'Email ou senha incorretos.' });
-    res.cookie('token', signToken(user), { httpOnly:true, maxAge:7*24*60*60*1000 });
-    res.json({ ok:true, user:{ email:user.email, role:user.role } });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/login', (req,res) => {
+  const {email,password} = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE email=?').get((email||'').toLowerCase());
+  if (!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({ error:'Email ou senha incorretos.' });
+  res.cookie('token', signToken(user), { httpOnly:true, maxAge:7*24*60*60*1000 });
+  res.json({ ok:true, user:{ email:user.email, role:user.role } });
 });
 
 app.post('/api/logout', (req,res) => { res.clearCookie('token'); res.json({ ok:true }); });
 
-app.get('/api/me', auth, async (req,res) => {
-  try {
-    const rows = await sb.get('users', `?id=eq.${req.user.id}`);
-    const user = rows[0];
-    if (!user) return res.status(404).json({ error:'Não encontrado.' });
-    res.json({ id:user.id, email:user.email, role:user.role, hasGroqKey:!!user.personal_groq_key, hasGeminiKey:!!user.personal_gemini_key });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.get('/api/me', auth, (req,res) => {
+  const user = db.prepare('SELECT id,email,role FROM users WHERE id=?').get(req.user.id);
+  const keys = db.prepare('SELECT personal_groq_key,personal_gemini_key FROM users WHERE id=?').get(req.user.id);
+  res.json({ ...user, hasGroqKey:!!keys.personal_groq_key, hasGeminiKey:!!keys.personal_gemini_key });
 });
 
-app.post('/api/my-key', auth, async (req,res) => {
-  try {
-    const {groqKey,geminiKey} = req.body;
-    const upd = {};
-    if (groqKey!==undefined) upd.personal_groq_key = groqKey||null;
-    if (geminiKey!==undefined) upd.personal_gemini_key = geminiKey||null;
-    await sb.update('users', upd, `?id=eq.${req.user.id}`);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/my-key', auth, (req,res) => {
+  const {groqKey,geminiKey} = req.body;
+  if (groqKey!==undefined) db.prepare('UPDATE users SET personal_groq_key=? WHERE id=?').run(groqKey||null, req.user.id);
+  if (geminiKey!==undefined) db.prepare('UPDATE users SET personal_gemini_key=? WHERE id=?').run(geminiKey||null, req.user.id);
+  res.json({ ok:true });
 });
 
-app.post('/api/change-password', auth, async (req,res) => {
-  try {
-    const {currentPassword,newPassword} = req.body;
-    if (!currentPassword||!newPassword) return res.status(400).json({ error:'Preencha todos os campos.' });
-    if (newPassword.length<6) return res.status(400).json({ error:'Nova senha mínima: 6 caracteres.' });
-    const rows = await sb.get('users', `?id=eq.${req.user.id}`);
-    const user = rows[0];
-    if (!bcrypt.compareSync(currentPassword,user.password)) return res.status(401).json({ error:'Senha atual incorreta.' });
-    await sb.update('users', { password:bcrypt.hashSync(newPassword,10) }, `?id=eq.${req.user.id}`);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/change-password', auth, (req,res) => {
+  const {currentPassword,newPassword} = req.body;
+  if (!currentPassword||!newPassword) return res.status(400).json({ error:'Preencha todos os campos.' });
+  if (newPassword.length<6) return res.status(400).json({ error:'Nova senha mínima: 6 caracteres.' });
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
+  if (!bcrypt.compareSync(currentPassword,user.password)) return res.status(401).json({ error:'Senha atual incorreta.' });
+  db.prepare('UPDATE users SET password=? WHERE id=?').run(bcrypt.hashSync(newPassword,10), req.user.id);
+  res.json({ ok:true });
 });
 
-// ── Conversations ─────────────────────────────────────────────────────────────
-app.get('/api/conversations', auth, async (req,res) => {
-  try {
-    const rows = await sb.get('conversations', `?user_id=eq.${req.user.id}&order=updated_at.desc&limit=50&select=id,title,provider,model,updated_at`);
-    res.json(rows);
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.get('/api/conversations', auth, (req,res) => {
+  res.json(db.prepare('SELECT id,title,provider,model,updated_at FROM conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 50').all(req.user.id));
 });
 
-app.get('/api/conversations/:id', auth, async (req,res) => {
-  try {
-    const rows = await sb.get('conversations', `?id=eq.${req.params.id}&user_id=eq.${req.user.id}`);
-    if (!rows.length) return res.status(404).json({ error:'Não encontrada.' });
-    const conv = rows[0];
-    res.json({ ...conv, messages: JSON.parse(conv.messages||'[]') });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.get('/api/conversations/:id', auth, (req,res) => {
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=? AND user_id=?').get(req.params.id, req.user.id);
+  if (!conv) return res.status(404).json({ error:'Não encontrada.' });
+  res.json({ ...conv, messages: JSON.parse(conv.messages) });
 });
 
-app.post('/api/conversations', auth, async (req,res) => {
-  try {
-    const {title,provider,model} = req.body;
-    const rows = await sb.insert('conversations', {
-      user_id:req.user.id, title:title||'Nova conversa',
-      provider:provider||'groq', model:model||'llama-3.3-70b-versatile', messages:'[]'
-    });
-    const conv = rows[0];
-    res.json({ ...conv, messages:[] });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/conversations', auth, (req,res) => {
+  const {title,provider,model} = req.body;
+  const r = db.prepare('INSERT INTO conversations (user_id,title,provider,model,messages) VALUES (?,?,?,?,?)').run(req.user.id, title||'Nova conversa', provider||'groq', model||'llama-3.3-70b-versatile', '[]');
+  const conv = db.prepare('SELECT * FROM conversations WHERE id=?').get(r.lastInsertRowid);
+  res.json({ ...conv, messages:[] });
 });
 
-app.delete('/api/conversations/:id', auth, async (req,res) => {
-  try {
-    await sb.delete('conversations', `?id=eq.${req.params.id}&user_id=eq.${req.user.id}`);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.delete('/api/conversations/:id', auth, (req,res) => {
+  db.prepare('DELETE FROM conversations WHERE id=? AND user_id=?').run(req.params.id, req.user.id);
+  res.json({ ok:true });
 });
 
-// ── Chat ──────────────────────────────────────────────────────────────────────
 app.post('/api/chat', auth, async (req,res) => {
+  const {messages, systemPrompt, provider, model, conversationId} = req.body;
+  if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
+  const userData = db.prepare('SELECT personal_groq_key,personal_gemini_key FROM users WHERE id=?').get(req.user.id);
+  let apiKey;
+  if (provider==='groq') {
+    apiKey = userData?.personal_groq_key || db.prepare('SELECT value FROM config WHERE key=?').get('global_groq_key')?.value || process.env.GROQ_API_KEY;
+    if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Groq configurada.' });
+  } else {
+    apiKey = userData?.personal_gemini_key || db.prepare('SELECT value FROM config WHERE key=?').get('global_gemini_key')?.value || process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Gemini configurada.' });
+  }
+  const usedModel = model || (provider==='groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.0-flash');
   try {
-    const {messages, systemPrompt, provider, model, conversationId} = req.body;
-    if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
-
-    const userRows = await sb.get('users', `?id=eq.${req.user.id}`);
-    const userData = userRows[0];
-
-    let apiKey;
-    if (provider==='groq') {
-      const cfgRows = await sb.get('config', `?key=eq.global_groq_key`);
-      apiKey = userData?.personal_groq_key || cfgRows[0]?.value || process.env.GROQ_API_KEY;
-      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Groq configurada.' });
-    } else {
-      const cfgRows = await sb.get('config', `?key=eq.global_gemini_key`);
-      apiKey = userData?.personal_gemini_key || cfgRows[0]?.value || process.env.GEMINI_API_KEY;
-      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Gemini configurada.' });
-    }
-
-    const usedModel = model || (provider==='groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.0-flash');
-    const reply = provider==='groq'
-      ? await callGroq(apiKey, usedModel, messages, systemPrompt)
-      : await callGemini(apiKey, usedModel, messages, systemPrompt);
-
+    const reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt) : await callGemini(apiKey, usedModel, messages, systemPrompt);
     if (conversationId) {
-      const convRows = await sb.get('conversations', `?id=eq.${conversationId}&user_id=eq.${req.user.id}`);
-      if (convRows.length) {
-        const conv = convRows[0];
+      const conv = db.prepare('SELECT * FROM conversations WHERE id=? AND user_id=?').get(conversationId, req.user.id);
+      if (conv) {
         const updated = [...messages, { role:'assistant', content:reply }];
         let title = conv.title;
         if (title==='Nova conversa' && messages.length===1) title = (messages[0].content||'').slice(0,40);
-        await sb.update('conversations', {
-          messages: JSON.stringify(updated),
-          title,
-          updated_at: Math.floor(Date.now()/1000)
-        }, `?id=eq.${conversationId}`);
+        db.prepare('UPDATE conversations SET messages=?,title=?,updated_at=? WHERE id=?').run(JSON.stringify(updated), title, Math.floor(Date.now()/1000), conversationId);
       }
     }
     res.json({ reply });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+  } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
 async function callGroq(apiKey, model, messages, sys) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
     body: JSON.stringify({ model, messages:[{role:'system',content:sys||'Você é um assistente prestativo. Responda em português.'},...messages], max_tokens:2048, temperature:0.7 })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`Groq erro ${r.status}`); }
-  const d = await r.json();
-  return d.choices?.[0]?.message?.content||'Sem resposta.';
+  return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
 }
 
 async function callGemini(apiKey, model, messages, sys) {
   const contents = messages.map(m => ({ role:m.role==='assistant'?'model':'user', parts:[{text:m.content}] }));
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ system_instruction:{parts:[{text:sys||'Você é um assistente prestativo. Responda em português.'}]}, contents, generationConfig:{maxOutputTokens:2048,temperature:0.7} })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`Gemini erro ${r.status}`); }
-  const d = await r.json();
-  return d.candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta.';
+  return (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta.';
 }
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
-app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
-  try {
-    const rows = await sb.get('config', `?key=in.(global_groq_key,global_gemini_key,global_groq_model,global_gemini_model)`);
-    const cfg = {};
-    rows.forEach(r => cfg[r.key]=r.value);
-    res.json({
-      groqKeyMasked: cfg.global_groq_key?cfg.global_groq_key.slice(0,8)+'••••':null, hasGroqKey:!!cfg.global_groq_key, groqModel:cfg.global_groq_model||'llama-3.3-70b-versatile',
-      geminiKeyMasked: cfg.global_gemini_key?cfg.global_gemini_key.slice(0,8)+'••••':null, hasGeminiKey:!!cfg.global_gemini_key, geminiModel:cfg.global_gemini_model||'gemini-2.0-flash',
-    });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.get('/api/admin/config', auth, role('creator','admin'), (req,res) => {
+  const g = k => db.prepare('SELECT value FROM config WHERE key=?').get(k)?.value||'';
+  res.json({
+    groqKeyMasked: g('global_groq_key')?g('global_groq_key').slice(0,8)+'••••':null, hasGroqKey:!!g('global_groq_key'), groqModel:g('global_groq_model')||'llama-3.3-70b-versatile',
+    geminiKeyMasked: g('global_gemini_key')?g('global_gemini_key').slice(0,8)+'••••':null, hasGeminiKey:!!g('global_gemini_key'), geminiModel:g('global_gemini_model')||'gemini-2.0-flash',
+  });
 });
 
-app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
-  try {
-    const {groqKey,geminiKey,groqModel,geminiModel} = req.body;
-    const upsert = async (k,v) => {
-      const ex = await sb.get('config', `?key=eq.${k}`);
-      if (ex.length) await sb.update('config', {value:v}, `?key=eq.${k}`);
-      else await sb.insert('config', {key:k,value:v});
-    };
-    if (groqKey) await upsert('global_groq_key', groqKey);
-    if (geminiKey) await upsert('global_gemini_key', geminiKey);
-    if (groqModel) await upsert('global_groq_model', groqModel);
-    if (geminiModel) await upsert('global_gemini_model', geminiModel);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/admin/config', auth, role('creator'), (req,res) => {
+  const u = db.prepare('INSERT OR REPLACE INTO config (key,value) VALUES (?,?)');
+  const {groqKey,geminiKey,groqModel,geminiModel} = req.body;
+  if (groqKey) u.run('global_groq_key',groqKey);
+  if (geminiKey) u.run('global_gemini_key',geminiKey);
+  if (groqModel) u.run('global_groq_model',groqModel);
+  if (geminiModel) u.run('global_gemini_model',geminiModel);
+  res.json({ ok:true });
 });
 
-app.get('/api/admin/users', auth, role('creator','admin'), async (req,res) => {
-  try {
-    const rows = await sb.get('users', `?order=created_at.desc&select=id,email,role,created_at,personal_groq_key,personal_gemini_key`);
-    res.json(rows.map(u=>({...u, hasGroqKey:!!u.personal_groq_key, hasGeminiKey:!!u.personal_gemini_key, personal_groq_key:undefined, personal_gemini_key:undefined})));
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.get('/api/admin/users', auth, role('creator','admin'), (req,res) => {
+  const users = db.prepare('SELECT id,email,role,created_at,personal_groq_key,personal_gemini_key FROM users ORDER BY created_at DESC').all();
+  res.json(users.map(u=>({...u,hasGroqKey:!!u.personal_groq_key,hasGeminiKey:!!u.personal_gemini_key,personal_groq_key:undefined,personal_gemini_key:undefined})));
 });
 
-app.post('/api/admin/users', auth, role('creator','admin'), async (req,res) => {
-  try {
-    const {email,password,role:newRole} = req.body;
-    if (!email||!password) return res.status(400).json({ error:'Email e senha obrigatórios.' });
-    if (newRole==='creator') return res.status(403).json({ error:'Não é possível criar outro criador.' });
-    if (newRole==='admin'&&req.user.role!=='creator') return res.status(403).json({ error:'Apenas o criador pode criar admins.' });
-    const ex = await sb.get('users', `?email=eq.${encodeURIComponent(email.toLowerCase())}`);
-    if (ex.length) return res.status(400).json({ error:'Email já cadastrado.' });
-    await sb.insert('users', { email:email.toLowerCase(), password:bcrypt.hashSync(password,10), role:newRole||'user' });
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.post('/api/admin/users', auth, role('creator','admin'), (req,res) => {
+  const {email,password,role:newRole} = req.body;
+  if (!email||!password) return res.status(400).json({ error:'Email e senha obrigatórios.' });
+  if (newRole==='creator') return res.status(403).json({ error:'Não é possível criar outro criador.' });
+  if (newRole==='admin'&&req.user.role!=='creator') return res.status(403).json({ error:'Apenas o criador pode criar admins.' });
+  if (db.prepare('SELECT id FROM users WHERE email=?').get(email.toLowerCase())) return res.status(400).json({ error:'Email já cadastrado.' });
+  db.prepare('INSERT INTO users (email,password,role) VALUES (?,?,?)').run(email.toLowerCase(), bcrypt.hashSync(password,10), newRole||'user');
+  res.json({ ok:true });
 });
 
-app.patch('/api/admin/users/:id/role', auth, role('creator'), async (req,res) => {
-  try {
-    const {role:newRole} = req.body;
-    if (newRole==='creator') return res.status(400).json({ error:'Operação não permitida.' });
-    const rows = await sb.get('users', `?id=eq.${req.params.id}`);
-    if (!rows.length||rows[0].role==='creator') return res.status(400).json({ error:'Operação não permitida.' });
-    await sb.update('users', {role:newRole}, `?id=eq.${req.params.id}`);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.patch('/api/admin/users/:id/role', auth, role('creator'), (req,res) => {
+  const {role:newRole} = req.body;
+  if (newRole==='creator') return res.status(400).json({ error:'Operação não permitida.' });
+  const t = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+  if (!t||t.role==='creator') return res.status(400).json({ error:'Operação não permitida.' });
+  db.prepare('UPDATE users SET role=? WHERE id=?').run(newRole,req.params.id);
+  res.json({ ok:true });
 });
 
-app.delete('/api/admin/users/:id', auth, role('creator','admin'), async (req,res) => {
-  try {
-    const rows = await sb.get('users', `?id=eq.${req.params.id}`);
-    if (!rows.length) return res.status(404).json({ error:'Usuário não encontrado.' });
-    if (rows[0].role==='creator') return res.status(400).json({ error:'Não é possível deletar o criador.' });
-    if (rows[0].role==='admin'&&req.user.role!=='creator') return res.status(403).json({ error:'Apenas o criador pode remover admins.' });
-    await sb.delete('users', `?id=eq.${req.params.id}`);
-    res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error:e.message }); }
+app.delete('/api/admin/users/:id', auth, role('creator','admin'), (req,res) => {
+  const t = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+  if (!t) return res.status(404).json({ error:'Usuário não encontrado.' });
+  if (t.role==='creator') return res.status(400).json({ error:'Não é possível deletar o criador.' });
+  if (t.role==='admin'&&req.user.role!=='creator') return res.status(403).json({ error:'Apenas o criador pode remover admins.' });
+  db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
+  res.json({ ok:true });
 });
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
-app.listen(PORT, async () => {
-  console.log(`🚀 Nexia rodando na porta ${PORT}`);
-  await initDB();
-});
+app.listen(PORT, () => console.log(`🚀 Nexia rodando na porta ${PORT}`));
