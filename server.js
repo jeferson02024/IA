@@ -458,7 +458,8 @@ app.post('/api/forgot-password', async (req,res) => {
     await q('DELETE FROM reset_tokens WHERE user_id=$1', [user.id]);
     await q('INSERT INTO reset_tokens (token,user_id,expires_at) VALUES ($1,$2,$3)', [token, user.id, expires]);
     const link = `${BASE_URL}/reset-password.html?token=${token}`;
-    await mailer.sendMail({
+    console.log('📧 Enviando email para:', email);
+    const mailResult = await mailer.sendMail({
       from: '"Nexia Suporte" <nexiasuporte646@gmail.com>',
       to: email,
       subject: 'Redefinir senha — Nexia',
@@ -475,8 +476,9 @@ app.post('/api/forgot-password', async (req,res) => {
         </div>
       `
     });
+    console.log('✅ Email enviado:', mailResult.messageId);
     res.json({ ok:true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { console.error('❌ Erro email:', e.message); res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/reset-password', async (req,res) => {
