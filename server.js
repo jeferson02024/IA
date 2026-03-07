@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
+const JSZip = require('jszip');
 const path = require('path');
 
 const app = express();
@@ -128,7 +129,6 @@ app.post('/api/upload', auth, async (req,res) => {
       const boundary = contentType.split('boundary=')[1];
       if (!boundary) return res.status(400).json({ error: 'Requisição inválida.' });
 
-      // Parse multipart manually
       const boundaryBuf = Buffer.from('--' + boundary);
       const parts = [];
       let start = 0;
@@ -137,8 +137,7 @@ app.post('/api/upload', auth, async (req,res) => {
         if (idx === -1) break;
         const end = body.indexOf(boundaryBuf, idx + boundaryBuf.length);
         if (end === -1) break;
-        const part = body.slice(idx + boundaryBuf.length + 2, end - 2);
-        parts.push(part);
+        parts.push(body.slice(idx + boundaryBuf.length + 2, end - 2));
         start = end;
       }
 
@@ -152,19 +151,37 @@ app.post('/api/upload', auth, async (req,res) => {
         if (!nameMatch || nameMatch[1] !== 'file' || !filenameMatch) continue;
         const filename = filenameMatch[1];
         const ext = filename.split('.').pop().toLowerCase();
+
+        // Imagens
         const imageExts = ['jpg','jpeg','png','gif','webp'];
         if (imageExts.includes(ext)) {
           const mimeMap = {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp'};
           return res.json({ type:'image', mimeType: mimeMap[ext]||'image/jpeg', base64: content.toString('base64') });
         }
-        // Text/ZIP files - read as text
-        let text = '';
+
+        // ZIP — extrai todos os arquivos de texto
         if (ext === 'zip') {
-          text = '[Arquivo ZIP recebido: ' + filename + '] — Conteúdo binário não pode ser exibido como texto.';
-        } else {
-          text = content.toString('utf-8').slice(0, 50000);
+          const zip = await JSZip.loadAsync(content);
+          const textExts = ['js','ts','py','html','css','json','md','txt','sh','jsx','tsx','vue','php','go','rs','java','cpp','c','env','yaml','yml','toml','xml','sql'];
+          let extracted = [];
+          for (const [name, file] of Object.entries(zip.files)) {
+            if (file.dir) continue;
+            const fext = name.split('.').pop().toLowerCase();
+            if (!textExts.includes(fext)) continue;
+            const text = await file.async('string');
+            extracted.push({ name, content: text.slice(0, 10000) });
+            if (extracted.length >= 30) break; // limite de 30 arquivos
+          }
+          if (!extracted.length) return res.json({ type:'text', filename, content: '[ZIP sem arquivos de texto legíveis]' });
+          const summary = extracted.map(f => `### ${f.name}
+\`\`\`
+${f.content}
+\`\`\``).join('\n\n');
+          return res.json({ type:'zip', filename, files: extracted, content: summary, fileCount: extracted.length });
         }
-        return res.json({ type:'text', filename, content: text });
+
+        // Texto normal
+        return res.json({ type:'text', filename, content: content.toString('utf-8').slice(0, 50000) });
       }
       res.status(400).json({ error: 'Nenhum arquivo encontrado.' });
     });
