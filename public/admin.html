@@ -282,9 +282,11 @@ async function loadUsers() {
       : '<span class="kb none">Global</span>';
     const canDel = u.role!=='creator' && (me.role==='creator'||u.role==='user');
     const canProm = me.role==='creator' && u.role!=='creator';
+    const canResetPwd = me.role==='creator' && u.role!=='creator';
     const acts = [];
     if (canProm&&u.role==='user') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
     if (canProm&&u.role==='admin') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
+    if (canResetPwd) acts.push(`<button class="btn-role" onclick="resetPwd(${u.id},'${u.email}')">🔑 Senha</button>`);
     if (canDel) acts.push(`<button class="btn-del" onclick="delUser(${u.id},'${u.email}')">Remover</button>`);
     return `<tr>
       <td style="font-size:12px">${u.email}</td>
@@ -322,6 +324,16 @@ async function changeRole(id,newRole){
   const d=await r.json();
   if(!r.ok)return toast(d.error,'err');
   toast('✅ Papel alterado!','ok');loadUsers();
+}
+
+async function resetPwd(id,email){
+  const newPassword = prompt(`Nova senha para ${email}:\n(mínimo 6 caracteres)`);
+  if(!newPassword) return;
+  if(newPassword.length<6) return toast('Senha mínima: 6 caracteres.','err');
+  const r=await fetch(`/api/admin/users/${id}/password`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword})});
+  const d=await r.json();
+  if(!r.ok) return toast(d.error,'err');
+  toast(`Senha de ${email} atualizada!`,'ok');
 }
 
 async function delUser(id,email){
