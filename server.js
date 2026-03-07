@@ -116,7 +116,8 @@ app.post('/api/change-password', auth, async (req,res) => {
 
 app.get('/api/conversations', auth, async (req,res) => {
   try {
-    const r = await q('SELECT id,title,provider,model,updated_at FROM conversations WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 50', [req.user.id]);
+    const r = await q('SELECT id,title,provider,model,updated_at FROM conversations WHERE user_id=$1 ORDER BY id DESC LIMIT 50', [req.user.id]);
+    console.log('Conversas user', req.user.id, ':', r.rows.length);
     res.json(r.rows);
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
