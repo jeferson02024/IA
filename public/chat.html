@@ -499,11 +499,27 @@ async function send(){
       // Se a resposta tem blocos de código, adiciona botão Baixar ZIP
       const codeBlocks = extractCodeBlocks(d.reply);
       if(codeBlocks.length > 0){
+        const wrap = document.createElement('div');
+        wrap.className = 'zip-download-wrap';
         const btn = document.createElement('button');
         btn.className = 'zip-download-btn';
         btn.innerHTML = '📦 Baixar ZIP';
-        btn.onclick = () => buildAndDownloadZip(codeBlocks);
-        document.getElementById('messages').appendChild(btn);
+        btn.onclick = async () => {
+          btn.classList.add('loading');
+          btn.innerHTML = '⏳ Baixando ZIP...';
+          btn.disabled = true;
+          await buildAndDownloadZip(codeBlocks);
+          btn.classList.remove('loading');
+          btn.classList.add('success');
+          btn.innerHTML = '✅ ZIP baixado com sucesso!';
+          setTimeout(()=>{
+            btn.classList.remove('success');
+            btn.innerHTML = '📦 Baixar ZIP';
+            btn.disabled = false;
+          }, 3000);
+        };
+        wrap.appendChild(btn);
+        document.getElementById('messages').appendChild(wrap);
         document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
       }
       if(history.length===2){
