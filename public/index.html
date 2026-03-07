@@ -116,6 +116,14 @@
   .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;border:1px solid #ddd;border-radius:10px;padding:11px 16px;color:#333;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none;margin-top:2px}
   .btn-google:hover{background:#f5f5f5;box-shadow:0 2px 8px rgba(0,0,0,.1)}
   .btn-google img{width:20px;height:20px}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:380px}
+  .modal h3{font-size:16px;font-weight:600;margin-bottom:6px}
+  .modal p{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .modal-btns{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+  .btn-cancel{background:none;border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer}
+  .btn-send{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -142,6 +150,7 @@
       <label>Senha</label>
       <input type="password" id="lSenha" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()" />
     </div>
+    <div style="text-align:right;margin-top:-8px"><a href="#" onclick="openForgot()" style="font-size:12px;color:var(--muted);text-decoration:none">Esqueci a senha</a></div>
     <button class="btn" id="btnLogin" onclick="login()">Entrar</button>
     <div class="divider">ou</div>
     <a class="btn-google" href="/auth/google">
@@ -173,6 +182,19 @@
   </div>
 </div>
 
+<div class="overlay" id="forgotOverlay">
+  <div class="modal">
+    <h3>Esqueci a senha</h3>
+    <p>Digite seu email e enviaremos um link para redefinir sua senha.</p>
+    <div class="field"><label>Email</label><input type="email" id="forgotEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')sendForgot()"/></div>
+    <div id="forgotMsg" style="font-size:13px;display:none;padding:8px 12px;border-radius:8px;margin-top:4px"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeForgot()">Cancelar</button>
+      <button class="btn-send" id="btnForgot" onclick="sendForgot()">Enviar link</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // Mostra erro se veio do Google com falha
   if(new URLSearchParams(location.search).get('error')==='google'){
@@ -180,6 +202,24 @@
     err.textContent='Erro ao entrar com Google. Tente novamente.';
     err.style.display='block';
   }
+  function openForgot(){ document.getElementById('forgotEmail').value=''; document.getElementById('forgotMsg').style.display='none'; document.getElementById('forgotOverlay').classList.add('show'); setTimeout(()=>document.getElementById('forgotEmail').focus(),100); }
+  function closeForgot(){ document.getElementById('forgotOverlay').classList.remove('show'); }
+
+  async function sendForgot(){
+    const email = document.getElementById('forgotEmail').value.trim();
+    const msg = document.getElementById('forgotMsg');
+    const btn = document.getElementById('btnForgot');
+    if(!email){ msg.style.cssText='display:block;background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)'; msg.textContent='Digite seu email.'; return; }
+    btn.textContent='Enviando...'; btn.disabled=true;
+    const r = await fetch('/api/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const d = await r.json();
+    btn.textContent='Enviar link'; btn.disabled=false;
+    if(!r.ok){ msg.style.cssText='display:block;background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)'; msg.textContent=d.error; return; }
+    msg.style.cssText='display:block;background:rgba(25,195,125,.1);color:#19c37d;border:1px solid rgba(25,195,125,.2)';
+    msg.textContent='✅ Link enviado! Verifique seu email.';
+    setTimeout(closeForgot, 3000);
+  }
+
   function switchTab(tab) {
     document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
     document.getElementById('tabReg').classList.toggle('active', tab === 'register');
