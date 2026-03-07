@@ -496,6 +496,16 @@ async function send(){
     else{
       addMsg('ai',d.reply,provider);
       history.push({role:'assistant',content:d.reply});
+      // Se a resposta tem blocos de código, adiciona botão Baixar ZIP
+      const codeBlocks = extractCodeBlocks(d.reply);
+      if(codeBlocks.length > 0){
+        const btn = document.createElement('button');
+        btn.className = 'zip-download-btn';
+        btn.innerHTML = '📦 Baixar ZIP';
+        btn.onclick = () => buildAndDownloadZip(codeBlocks);
+        document.getElementById('messages').appendChild(btn);
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+      }
       if(history.length===2){
         const title=displayText.slice(0,40)+(displayText.length>40?'...':'');
         const conv=conversations.find(c=>c.id===currentConvId);
@@ -613,6 +623,33 @@ function showTyping(){
   const col=provColors[provider]||'var(--accent)';
   d.innerHTML=`<div class="typing-inner"><div class="msg-av" style="background:${col};width:28px;height:28px;border-radius:4px;overflow:hidden;flex-shrink:0"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover"></div><div class="tdots"><span></span><span></span><span></span></div></div>`;
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
+}
+
+function extractCodeBlocks(text){
+  const blocks = [];
+  const regex = /```(\w*)\n?([\s\S]*?)```/g;
+  let match;
+  let i = 0;
+  while((match = regex.exec(text)) !== null){
+    const lang = match[1] || 'txt';
+    const code = match[2].trim();
+    if(!code) continue;
+    const ext = langToExt(lang);
+    blocks.push({ fname: `arquivo${++i}${ext}`, code });
+  }
+  return blocks;
+}
+
+async function buildAndDownloadZip(blocks){
+  const zip = new JSZip();
+  blocks.forEach(b => zip.file(b.fname, b.code));
+  const blob = await zip.generateAsync({type:'blob'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'projeto.zip';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 init();
