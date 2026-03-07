@@ -200,6 +200,36 @@ async function callGemini(apiKey, model, messages, sys) {
   return (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta.';
 }
 
+
+app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
+  try {
+    const totalUsers = await q("SELECT COUNT(*) as c FROM users WHERE role='user'");
+    const totalAdmins = await q("SELECT COUNT(*) as c FROM users WHERE role='admin'");
+    const totalConvs = await q("SELECT COUNT(*) as c FROM conversations");
+    const totalMsgs = await q("SELECT messages FROM conversations");
+    let msgCount = 0;
+    totalMsgs.rows.forEach(r => { try { msgCount += JSON.parse(r.messages).length; } catch{} });
+    const byUser = await q(`SELECT u.email, u.role, COUNT(c.id) as convs, MAX(c.updated_at) as last_active
+      FROM users u LEFT JOIN conversations c ON c.user_id=u.id
+      GROUP BY u.id, u.email, u.role ORDER BY last_active DESC NULLS LAST`);
+    const modelUsage = await q("SELECT model, COUNT(*) as c FROM conversations GROUP BY model ORDER BY c DESC");
+    const providerUsage = await q("SELECT provider, COUNT(*) as c FROM conversations GROUP BY provider ORDER BY c DESC");
+    const dailyUsage = await q(`SELECT TO_CHAR(TO_TIMESTAMP(updated_at), 'YYYY-MM-DD') as day, COUNT(*) as c
+      FROM conversations WHERE updated_at IS NOT NULL
+      GROUP BY day ORDER BY day DESC LIMIT 14`);
+    res.json({
+      totalUsers: parseInt(totalUsers.rows[0].c),
+      totalAdmins: parseInt(totalAdmins.rows[0].c),
+      totalConvs: parseInt(totalConvs.rows[0].c),
+      totalMsgs: msgCount,
+      byUser: byUser.rows,
+      modelUsage: modelUsage.rows,
+      providerUsage: providerUsage.rows,
+      dailyUsage: dailyUsage.rows.reverse(),
+    });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
     const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model')");
