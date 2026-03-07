@@ -8,6 +8,9 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY || 're_Z1rHJYpi_A3yFzzJLwJxbeRocJDXPXLja');
+
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '932508182659-gevg6ph5ief33eq5jq532bqib6g4n3hb.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
 const BASE_URL = process.env.BASE_URL || 'https://ia-2-uvqg.onrender.com';
@@ -78,6 +81,11 @@ async function initDB() {
   }
   if (process.env.GROQ_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_groq_key', process.env.GROQ_API_KEY]);
   if (process.env.GEMINI_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_gemini_key', process.env.GEMINI_API_KEY]);
+  await q(`CREATE TABLE IF NOT EXISTS reset_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at BIGINT NOT NULL
+  )`);
   console.log('✅ Banco pronto!');
 }
 
@@ -429,6 +437,58 @@ app.delete('/api/admin/users/:id', auth, role('creator','admin'), async (req,res
     await q('DELETE FROM users WHERE id=$1', [req.params.id]);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+app.post('/api/forgot-password', async (req,res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email obrigatório.' });
+    const r = await q('SELECT * FROM users WHERE email=$1', [email.toLowerCase()]);
+    if (!r.rows.length) return res.json({ ok:true }); // não revela se existe
+    const user = r.rows[0];
+    if (user.password === 'google-oauth') return res.status(400).json({ error: 'Esta conta usa login com Google.' });
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expires = Math.floor(Date.now()/1000) + 3600; // 1 hora
+    await q('DELETE FROM reset_tokens WHERE user_id=$1', [user.id]);
+    await q('INSERT INTO reset_tokens (token,user_id,expires_at) VALUES ($1,$2,$3)', [token, user.id, expires]);
+    const link = `${BASE_URL}/reset-password.html?token=${token}`;
+    await resend.emails.send({
+      from: 'Nexia <onboarding@resend.dev>',
+      to: email,
+      subject: 'Redefinir senha — Nexia',
+      html: `
+        <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;background:#0f0f0f;color:#ececec;border-radius:16px;padding:32px;border:1px solid #2a2a2a">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
+            <div style="width:36px;height:36px;background:#19c37d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🤖</div>
+            <span style="font-size:18px;font-weight:700">Nexia</span>
+          </div>
+          <h2 style="margin:0 0 8px;font-size:20px">Redefinir sua senha</h2>
+          <p style="color:#8e8ea0;margin:0 0 24px;font-size:14px">Clique no botão abaixo para criar uma nova senha. O link expira em 1 hora.</p>
+          <a href="${link}" style="display:inline-block;background:#19c37d;color:#000;text-decoration:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:15px">Redefinir senha</a>
+          <p style="color:#555;margin:24px 0 0;font-size:12px">Se você não solicitou isso, ignore este email.</p>
+        </div>
+      `
+    });
+    res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/reset-password', async (req,res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'Dados inválidos.' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Senha mínima: 6 caracteres.' });
+    const r = await q('SELECT * FROM reset_tokens WHERE token=$1', [token]);
+    if (!r.rows.length) return res.status(400).json({ error: 'Link inválido ou expirado.' });
+    const rt = r.rows[0];
+    if (Math.floor(Date.now()/1000) > rt.expires_at) {
+      await q('DELETE FROM reset_tokens WHERE token=$1', [token]);
+      return res.status(400).json({ error: 'Link expirado. Solicite um novo.' });
+    }
+    await q('UPDATE users SET password=$1 WHERE id=$2', [require('bcryptjs').hashSync(newPassword,10), rt.user_id]);
+    await q('DELETE FROM reset_tokens WHERE token=$1', [token]);
+    res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/auth/google', passport.authenticate('google', { scope:['profile','email'] }));
