@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nexia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -530,13 +531,77 @@ function addMsgComplex(role,content,prov){
 }
 
 function fmt(text){
-  text=text.replace(/```(\w*)\n?([\s\S]*?)```/g,(_,l,code)=>`<pre><code>${code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</code></pre>`);
-  text=text.replace(/`([^`]+)`/g,'<code>$1</code>');
+  // collect code blocks for zip
+  const blocks=[];
+  text=text.replace(/```(\w*)\n?([\s\S]*?)```/g,(_, lang, code)=>{
+    const safe=code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').trim();
+    const idx=blocks.length;
+    const ext=langToExt(lang);
+    const fname=`arquivo${idx+1}${ext}`;
+    blocks.push({lang,code:code.trim(),fname});
+    const blockId='cb'+Date.now()+idx;
+    return `<div class="code-block" id="${blockId}">
+      <div class="code-actions">
+        <button class="code-btn" onclick="copyCode('${blockId}')">📋 Copiar</button>
+        <button class="code-btn zip-btn" onclick="downloadZip('${blockId}','${fname}')">⬇️ ZIP</button>
+      </div>
+      <pre><code class="lang-${lang}">${safe}</code></pre>
+    </div>`;
+  });
+  // if multiple blocks, add "download all as zip" button
+  if(blocks.length>1){
+    const allId='allzip'+Date.now();
+    const dataAttr=encodeURIComponent(JSON.stringify(blocks.map(b=>({fname:b.fname,code:b.code}))));
+    text=text+`<div style="margin-top:8px"><button class="code-btn zip-btn" style="opacity:1" onclick="downloadAllZip('${allId}',decodeURIComponent('${dataAttr}'))">📦 Baixar tudo como ZIP</button></div>`;
+  }
+  text=text.replace(/\`([^\`]+)\`/g,'<code>$1</code>');
   text=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
   text=text.replace(/\*(.*?)\*/g,'<em>$1</em>');
   text=text.replace(/^[\-\*] (.+)/gm,'<li>$1</li>');
   text=text.replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>');
-  return text.split(/\n{2,}/).map(p=>{p=p.trim();if(!p)return'';if(p.startsWith('<pre>')||p.startsWith('<ul>'))return p;return`<p>${p.replace(/\n/g,'<br>')}</p>`;}).join('');
+  return text.split(/\n{2,}/).map(p=>{p=p.trim();if(!p)return'';if(p.startsWith('<div class="code-block')||p.startsWith('<ul>')||p.startsWith('<div style'))return p;return`<p>${p.replace(/\n/g,'<br>')}</p>`;}).join('');
+}
+
+function langToExt(lang){
+  const map={js:'.js',javascript:'.js',ts:'.ts',typescript:'.ts',py:'.py',python:'.py',html:'.html',css:'.css',json:'.json',md:'.md',sh:'.sh',bash:'.sh',java:'.java',cpp:'.cpp',c:'.c',php:'.php',go:'.go',rs:'.rs'};
+  return map[lang?.toLowerCase()]||'.txt';
+}
+
+function copyCode(blockId){
+  const el=document.getElementById(blockId);
+  if(!el)return;
+  const code=el.querySelector('code').innerText;
+  navigator.clipboard.writeText(code).then(()=>toast('Copiado!'));
+}
+
+function toast(msg){
+  const t=document.getElementById('toast')||document.createElement('div');
+  t.id='toast';t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;right:24px;background:#1e1e1e;border:1px solid #2a2a2a;border-radius:10px;padding:10px 16px;font-size:13px;color:#19c37d;z-index:9999;display:block';
+  document.body.appendChild(t);
+  setTimeout(()=>t.style.display='none',2000);
+}
+
+async function downloadZip(blockId, fname){
+  const el=document.getElementById(blockId);
+  if(!el)return;
+  const code=el.querySelector('code').innerText;
+  const zip=new JSZip();
+  zip.file(fname, code);
+  const blob=await zip.generateAsync({type:'blob'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fname.replace(/\.\w+$/,'')+'.zip';a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadAllZip(id, dataStr){
+  const files=JSON.parse(dataStr);
+  const zip=new JSZip();
+  files.forEach(f=>zip.file(f.fname, f.code));
+  const blob=await zip.generateAsync({type:'blob'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='projeto.zip';a.click();
+  URL.revokeObjectURL(url);
 }
 
 function showTyping(){
