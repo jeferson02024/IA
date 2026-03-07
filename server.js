@@ -117,6 +117,60 @@ app.post('/api/change-password', auth, async (req,res) => {
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+
+app.post('/api/upload', auth, async (req,res) => {
+  try {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      const body = Buffer.concat(chunks);
+      const contentType = req.headers['content-type'] || '';
+      const boundary = contentType.split('boundary=')[1];
+      if (!boundary) return res.status(400).json({ error: 'Requisição inválida.' });
+
+      // Parse multipart manually
+      const boundaryBuf = Buffer.from('--' + boundary);
+      const parts = [];
+      let start = 0;
+      while (true) {
+        const idx = body.indexOf(boundaryBuf, start);
+        if (idx === -1) break;
+        const end = body.indexOf(boundaryBuf, idx + boundaryBuf.length);
+        if (end === -1) break;
+        const part = body.slice(idx + boundaryBuf.length + 2, end - 2);
+        parts.push(part);
+        start = end;
+      }
+
+      for (const part of parts) {
+        const headerEnd = part.indexOf('\r\n\r\n');
+        if (headerEnd === -1) continue;
+        const headers = part.slice(0, headerEnd).toString();
+        const content = part.slice(headerEnd + 4);
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        if (!nameMatch || nameMatch[1] !== 'file' || !filenameMatch) continue;
+        const filename = filenameMatch[1];
+        const ext = filename.split('.').pop().toLowerCase();
+        const imageExts = ['jpg','jpeg','png','gif','webp'];
+        if (imageExts.includes(ext)) {
+          const mimeMap = {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp'};
+          return res.json({ type:'image', mimeType: mimeMap[ext]||'image/jpeg', base64: content.toString('base64') });
+        }
+        // Text/ZIP files - read as text
+        let text = '';
+        if (ext === 'zip') {
+          text = '[Arquivo ZIP recebido: ' + filename + '] — Conteúdo binário não pode ser exibido como texto.';
+        } else {
+          text = content.toString('utf-8').slice(0, 50000);
+        }
+        return res.json({ type:'text', filename, content: text });
+      }
+      res.status(400).json({ error: 'Nenhum arquivo encontrado.' });
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/conversations', auth, async (req,res) => {
   try {
     const r = await q('SELECT id,title,provider,model,updated_at FROM conversations WHERE user_id=$1 ORDER BY id DESC LIMIT 50', [req.user.id]);
