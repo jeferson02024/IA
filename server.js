@@ -8,8 +8,17 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY || 're_Z1rHJYpi_A3yFzzJLwJxbeRocJDXPXLja');
+const nodemailer = require('nodemailer');
+const mailer = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.GMAIL_USER || 'nexiasuporte646@gmail.com',
+    pass: process.env.GMAIL_PASS || 'lqfuxaeqdihhpcvh'
+  },
+  tls: { rejectUnauthorized: false }
+});
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '932508182659-gevg6ph5ief33eq5jq532bqib6g4n3hb.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
@@ -453,9 +462,8 @@ app.post('/api/forgot-password', async (req,res) => {
     await q('INSERT INTO reset_tokens (token,user_id,expires_at) VALUES ($1,$2,$3)', [token, user.id, expires]);
     const link = `${BASE_URL}/reset-password.html?token=${token}`;
     console.log('📧 Enviando email para:', email);
-    const mailResult = await resend.emails.send({
-      from: 'Nexia <onboarding@resend.dev>',
-      reply_to: 'nexiasuporte646@gmail.com',
+    const mailResult = await mailer.sendMail({
+      from: '"Nexia Suporte" <nexiasuporte646@gmail.com>',
       to: email,
       subject: 'Redefinir senha — Nexia',
       html: `
@@ -471,7 +479,7 @@ app.post('/api/forgot-password', async (req,res) => {
         </div>
       `
     });
-    console.log('✅ Email enviado:', mailResult.data?.id || mailResult.id);
+    console.log('✅ Email enviado:', mailResult.messageId);
     res.json({ ok:true });
   } catch(e) { console.error('❌ Erro email:', e.message); res.status(500).json({ error: e.message }); }
 });
