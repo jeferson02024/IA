@@ -243,6 +243,18 @@ app.post('/api/admin/users', auth, role('creator','admin'), async (req,res) => {
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+app.patch('/api/admin/users/:id/password', auth, role('creator'), async (req,res) => {
+  try {
+    const {newPassword} = req.body;
+    if (!newPassword||newPassword.length<6) return res.status(400).json({ error:'Senha mínima: 6 caracteres.' });
+    const t = await q('SELECT * FROM users WHERE id=$1', [req.params.id]);
+    if (!t.rows.length) return res.status(404).json({ error:'Usuário não encontrado.' });
+    if (t.rows[0].role==='creator') return res.status(400).json({ error:'Não é possível alterar a senha do criador por aqui.' });
+    await q('UPDATE users SET password=$1 WHERE id=$2', [bcrypt.hashSync(newPassword,10), req.params.id]);
+    res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 app.patch('/api/admin/users/:id/role', auth, role('creator'), async (req,res) => {
   try {
     const {role:newRole} = req.body;
