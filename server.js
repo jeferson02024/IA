@@ -4,6 +4,13 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
 const JSZip = require('jszip');
+const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '932508182659-gevg6ph5ief33eq5jq532bqib6g4n3hb.apps.googleusercontent.com';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
+const BASE_URL = process.env.BASE_URL || 'https://ia-2-uvqg.onrender.com';
 const path = require('path');
 
 const app = express();
@@ -14,6 +21,9 @@ const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...ar
 
 app.use(express.json({ limit: '20mb' }));
 app.use(cookieParser());
+app.use(session({ secret: JWT_SECRET, resave:false, saveUninitialized:false }));
+app.use(passport.initialize());
+app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const pool = new Pool({
@@ -22,6 +32,28 @@ const pool = new Pool({
 });
 
 const q = (sql, p=[]) => pool.query(sql, p);
+
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
+  try { const r = await q('SELECT * FROM users WHERE id=$1',[id]); done(null, r.rows[0]||false); }
+  catch(e) { done(e); }
+});
+
+passport.use(new GoogleStrategy({
+  clientID: GOOGLE_CLIENT_ID,
+  clientSecret: GOOGLE_CLIENT_SECRET,
+  callbackURL: BASE_URL + '/auth/google/callback'
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const email = profile.emails[0].value.toLowerCase();
+    let r = await q('SELECT * FROM users WHERE email=$1', [email]);
+    if (!r.rows.length) {
+      r = await q('INSERT INTO users (email,password,role) VALUES ($1,$2,$3) RETURNING *',
+        [email, 'google-oauth', 'user']);
+    }
+    done(null, r.rows[0]);
+  } catch(e) { done(e); }
+}));
 
 async function initDB() {
   await q(`CREATE TABLE IF NOT EXISTS users (
@@ -398,6 +430,21 @@ app.delete('/api/admin/users/:id', auth, role('creator','admin'), async (req,res
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
+
+app.get('/auth/google', passport.authenticate('google', { scope:['profile','email'] }));
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect:'/?error=google' }),
+  (req, res) => {
+    const token = require('jsonwebtoken').sign(
+      { id:req.user.id, email:req.user.email, role:req.user.role },
+      JWT_SECRET, { expiresIn:'7d' }
+    );
+    res.cookie('token', token, { httpOnly:true, maxAge:7*24*60*60*1000 });
+    if (req.user.role === 'user') res.redirect('/chat.html');
+    else res.redirect('/admin.html');
+  }
+);
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 app.listen(PORT, async () => {
