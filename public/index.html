@@ -111,6 +111,11 @@
     display: none;
   }
   .error.show { display: block; }
+  .divider{display:flex;align-items:center;gap:10px;margin:4px 0;color:var(--muted);font-size:12px}
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+  .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;border:1px solid #ddd;border-radius:10px;padding:11px 16px;color:#333;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;text-decoration:none;margin-top:2px}
+  .btn-google:hover{background:#f5f5f5;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+  .btn-google img{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -138,6 +143,11 @@
       <input type="password" id="lSenha" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') login()" />
     </div>
     <button class="btn" id="btnLogin" onclick="login()">Entrar</button>
+    <div class="divider">ou</div>
+    <a class="btn-google" href="/auth/google">
+      <img src="https://www.google.com/favicon.ico" alt="Google">
+      Continuar com Google
+    </a>
   </div>
 
   <!-- CADASTRO -->
@@ -155,10 +165,21 @@
       <input type="password" id="rSenha2" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter') register()" />
     </div>
     <button class="btn" id="btnReg" onclick="register()">Criar conta</button>
+    <div class="divider">ou</div>
+    <a class="btn-google" href="/auth/google">
+      <img src="https://www.google.com/favicon.ico" alt="Google">
+      Continuar com Google
+    </a>
   </div>
 </div>
 
 <script>
+  // Mostra erro se veio do Google com falha
+  if(new URLSearchParams(location.search).get('error')==='google'){
+    const err=document.getElementById('error');
+    err.textContent='Erro ao entrar com Google. Tente novamente.';
+    err.style.display='block';
+  }
   function switchTab(tab) {
     document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
     document.getElementById('tabReg').classList.toggle('active', tab === 'register');
