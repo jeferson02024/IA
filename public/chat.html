@@ -458,7 +458,10 @@ async function send(){
       displayText=text||'[Imagem enviada]';
     } else {
       // Text/ZIP: inject as text
-      const injected=`${text?text+'\n\n':''}Conteúdo do arquivo:\n${pendingFile.content}`;
+      const prefix = pendingFile.type==='zip'
+        ? `${text?text+'\n\n':''}Tenho um projeto ZIP com ${pendingFile.fileCount} arquivos. Aqui está o conteúdo de cada arquivo:\n\n${pendingFile.content}\n\nPor favor analise e ${text||'me ajude com este projeto'}.`
+        : `${text?text+'\n\n':''}Conteúdo do arquivo:\n${pendingFile.content}`;
+      const injected=prefix;
       msgContent=injected;
       displayText=text||(pendingFile.content.slice(0,60)+'...');
     }
