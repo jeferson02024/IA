@@ -91,14 +91,13 @@ async function initDB() {
   if (process.env.GROQ_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_groq_key', process.env.GROQ_API_KEY]);
   if (process.env.GEMINI_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_gemini_key', process.env.GEMINI_API_KEY]);
   if (process.env.OPENROUTER_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_openrouter_key', process.env.OPENROUTER_API_KEY]);
-  if (process.env.DEEPSEEK_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_deepseek_key', process.env.DEEPSEEK_API_KEY]);
+  if (process.env.TOGETHER_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_together_key', process.env.TOGETHER_API_KEY]);
   await q(`CREATE TABLE IF NOT EXISTS reset_tokens (
     token TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     expires_at BIGINT NOT NULL
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_openrouter_key TEXT`);
-  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_deepseek_key TEXT`);
   console.log('✅ Banco pronto!');
 }
 
@@ -405,7 +404,7 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_deepseek_key')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
@@ -413,7 +412,7 @@ app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
       geminiKeyMasked: cfg.global_gemini_key?cfg.global_gemini_key.slice(0,8)+'••••':null, hasGeminiKey:!!cfg.global_gemini_key, geminiModel:cfg.global_gemini_model||'gemini-2.0-flash',
       mistralKeyMasked: cfg.global_mistral_key?cfg.global_mistral_key.slice(0,8)+'••••':null, hasMistralKey:!!cfg.global_mistral_key, mistralModel:cfg.global_mistral_model||'mistral-large-latest',
       openrouterKeyMasked: cfg.global_openrouter_key?cfg.global_openrouter_key.slice(0,8)+'••••':null, hasOpenrouterKey:!!cfg.global_openrouter_key,
-      deepseekKeyMasked: cfg.global_deepseek_key?cfg.global_deepseek_key.slice(0,8)+'••••':null, hasDeepseekKey:!!cfg.global_deepseek_key,
+      togetherKeyMasked: cfg.global_together_key?cfg.global_together_key.slice(0,8)+'••••':null, hasTogetherKey:!!cfg.global_together_key,
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -430,7 +429,7 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (mistralKey) await upsert('global_mistral_key', mistralKey);
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
     if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
-    if (deepseekKey) await upsert('global_deepseek_key', deepseekKey);
+    if (togetherKey) await upsert('global_together_key', togetherKey);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -540,6 +539,26 @@ app.post('/api/reset-password', async (req,res) => {
     await q('UPDATE users SET password=$1 WHERE id=$2', [require('bcryptjs').hashSync(newPassword,10), rt.user_id]);
     await q('DELETE FROM reset_tokens WHERE token=$1', [token]);
     res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/generate-image', auth, async (req,res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt obrigatório.' });
+    const ck = await q('SELECT value FROM config WHERE key=$1', ['global_together_key']);
+    const apiKey = ck.rows[0]?.value || process.env.TOGETHER_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'Nenhuma API key do Together configurada.' });
+    const r = await fetch('https://api.together.xyz/v1/images/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell-Free', prompt, n: 1, width: 512, height: 512 })
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message||`Together erro ${r.status}`); }
+    const data = await r.json();
+    const imgUrl = data.data?.[0]?.url;
+    if (!imgUrl) throw new Error('Imagem não gerada.');
+    res.json({ url: imgUrl });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
