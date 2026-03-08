@@ -499,7 +499,7 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key','theme_accent','theme_bg','theme_sidebar','theme_surface')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key','theme_accent','theme_bg','theme_sidebar','theme_surface','cf_account_id','cf_api_token')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
@@ -509,6 +509,8 @@ app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
       openrouterKeyMasked: cfg.global_openrouter_key?cfg.global_openrouter_key.slice(0,8)+'••••':null, hasOpenrouterKey:!!cfg.global_openrouter_key,
       togetherKeyMasked: cfg.global_together_key?cfg.global_together_key.slice(0,8)+'••••':null, hasTogetherKey:!!cfg.global_together_key,
       theme: { accent: cfg.theme_accent||'#19c37d', bg: cfg.theme_bg||'#0f0f0f', sidebar: cfg.theme_sidebar||'#171717', surface: cfg.theme_surface||'#1e1e1e' },
+      hasCfToken: !!cfg.cf_api_token, cfTokenMasked: cfg.cf_api_token?cfg.cf_api_token.slice(0,8)+'••••':null,
+      hasCfAccount: !!cfg.cf_account_id,
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -521,11 +523,13 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (geminiKey) await upsert('global_gemini_key', geminiKey);
     if (groqModel) await upsert('global_groq_model', groqModel);
     if (geminiModel) await upsert('global_gemini_model', geminiModel);
-    const {mistralKey, mistralModel, openrouterKey, togetherKey} = req.body;
+    const {mistralKey, mistralModel, openrouterKey, togetherKey, cfAccountId, cfApiToken} = req.body;
     if (mistralKey) await upsert('global_mistral_key', mistralKey);
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
     if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
     if (togetherKey) await upsert('global_together_key', togetherKey);
+    if (cfAccountId) await upsert('cf_account_id', cfAccountId);
+    if (cfApiToken) await upsert('cf_api_token', cfApiToken);
     const {accentColor, bgColor, sidebarColor, surfaceColor} = req.body;
     if (accentColor) await upsert('theme_accent', accentColor);
     if (bgColor) await upsert('theme_bg', bgColor);
