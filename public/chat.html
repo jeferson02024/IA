@@ -672,24 +672,36 @@ function showTyping(){
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
 }
 
-function showGeneratedImage(imgUrl){
+function showGeneratedImage(imgUrl, attempt=1){
   const msgs = document.getElementById('messages');
+  // Remove existing loading div if retrying
+  const existing = document.getElementById('img-loading');
+  if(existing) existing.remove();
+
   const loadDiv = document.createElement('div');
+  loadDiv.id = 'img-loading';
   loadDiv.className = 'msg-row ai';
-  loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
+  loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem${attempt>1?' (tentativa '+attempt+')...':'...'}</p></div></div>`;
   msgs.appendChild(loadDiv);
   msgs.scrollTop = msgs.scrollHeight;
 
+  // Add cache-busting on retry
+  const url = attempt > 1 ? imgUrl + '&t=' + Date.now() : imgUrl;
+
   const img = new Image();
   const timeout = setTimeout(() => {
-    loadDiv.remove();
-    addMsg('ai', '❌ Tempo esgotado ao gerar imagem. Tente novamente.', provider);
-  }, 35000);
+    if(attempt < 3){
+      showGeneratedImage(imgUrl, attempt + 1);
+    } else {
+      loadDiv.remove();
+      addMsg('ai', '❌ Não consegui gerar a imagem. O servidor de imagens pode estar lento, tente novamente.', provider);
+    }
+  }, 40000);
 
   img.onload = () => {
     clearTimeout(timeout);
     loadDiv.remove();
-    const safeUrl = imgUrl.replace(/'/g, '%27');
+    const safeUrl = url.replace(/'/g, '%27');
     const wrap = document.createElement('div');
     wrap.className = 'msg-row ai';
     wrap.innerHTML = `
@@ -697,7 +709,7 @@ function showGeneratedImage(imgUrl){
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${imgUrl}" class="gen-img" alt="imagem gerada">
+            <img src="${url}" class="gen-img" alt="imagem gerada">
             <button class="img-download-btn" onclick="downloadImage('${safeUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
           </div>
         </div>
@@ -707,10 +719,14 @@ function showGeneratedImage(imgUrl){
   };
   img.onerror = () => {
     clearTimeout(timeout);
-    loadDiv.remove();
-    addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
+    if(attempt < 3){
+      setTimeout(() => showGeneratedImage(imgUrl, attempt + 1), 2000);
+    } else {
+      loadDiv.remove();
+      addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
+    }
   };
-  img.src = imgUrl;
+  img.src = url;
 }
 
 async function downloadImage(url, filename){
@@ -723,6 +739,20 @@ async function downloadImage(url, filename){
   document.body.appendChild(a);
   a.click();
   setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1000);
+}
+
+function downloadGeneratedImage(type, b64){
+  const a = document.createElement('a');
+  if(type === 'base64'){
+    a.href = b64;
+  } else {
+    a.href = type; // type is URL in this case
+  }
+  a.download = 'nexia-imagem.png';
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>document.body.removeChild(a), 1000);
 }
 
 function extractCodeBlocks(text){
