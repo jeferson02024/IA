@@ -168,6 +168,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
         <button class="provider-btn mistral" id="btnMistral" onclick="setProvider('mistral')">
           <div class="pdot mistral"></div>Mistral<span style="margin-left:auto;font-size:10px;color:var(--muted)">Rápido</span>
         </button>
+        <button class="provider-btn" id="btnOpenrouter" onclick="setProvider('openrouter')" style="border-color:rgba(124,58,237,.3)">
+          <div class="pdot" style="background:#7c3aed;box-shadow:0 0 6px #7c3aed"></div>Nexia<span style="margin-left:auto;font-size:10px;color:var(--muted)">50+ modelos</span>
+        </button>
+        <button class="provider-btn" id="btnDeepseek" onclick="setProvider('deepseek')" style="border-color:rgba(0,180,216,.3)">
+          <div class="pdot" style="background:#00b4d8;box-shadow:0 0 6px #00b4d8"></div>DeepSeek<span style="margin-left:auto;font-size:10px;color:var(--muted)">Grátis</span>
+        </button>
       </div>
       <div class="model-wrap">
         <select class="model-select" id="modelSelect" onchange="model=this.value"></select>
