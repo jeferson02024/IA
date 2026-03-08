@@ -782,7 +782,7 @@ function showGeneratedImage(imgUrl, attempt=1){
         <div class="msg-body">
           <div class="gen-img-wrap">
             <img src="${url}" class="gen-img" alt="imagem gerada">
-            <button class="img-download-btn" onclick="downloadImage('${safeUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
+            <button class="img-download-btn" onclick="baixarImagem('${safeUrl}')">⬇️ Baixar imagem</button>
           </div>
         </div>
       </div>`;
@@ -799,6 +799,16 @@ function showGeneratedImage(imgUrl, attempt=1){
     }
   };
   img.src = url;
+}
+
+function baixarImagem(url){
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'nexia-imagem-' + Date.now() + '.png';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 1000);
 }
 
 async function downloadImage(url, filename){
