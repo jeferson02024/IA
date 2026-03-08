@@ -118,19 +118,30 @@ input::placeholder{color:var(--muted)}
 .btn-primary{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 @media(max-width:800px){
   .sidenav{display:none}
-  .main{padding:12px;padding-bottom:80px}
+  .main{padding:16px}
+  header{display:none}
+  .mob-header{display:flex}
   .stats-grid{grid-template-columns:1fr 1fr}
   .api-grid,.two-col{grid-template-columns:1fr}
-  .bottom-nav{display:flex!important}
 }
-.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar);border-top:1px solid var(--border);z-index:100;padding:6px 4px;gap:2px;overflow-x:auto}
-.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:10px;white-space:nowrap;flex-shrink:0;transition:all .15s;min-width:50px}
-.bn-item.active{color:var(--accent);background:rgba(255,255,255,.05)}
-.bn-item .bn-icon{font-size:18px}
+.mob-header{display:none;position:sticky;top:0;z-index:200;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;align-items:center;gap:12px}
+.hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;backdrop-filter:blur(2px)}
+.mob-overlay.show{display:block}
+.mob-drawer{position:fixed;left:-280px;top:0;bottom:0;width:280px;background:var(--card);border-right:1px solid var(--border);z-index:301;transition:left .25s ease;display:flex;flex-direction:column;overflow-y:auto}
+.mob-drawer.open{left:0}
+.mob-drawer-header{padding:20px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.mob-nav-item{display:flex;align-items:center;gap:12px;padding:13px 16px;font-size:14px;cursor:pointer;color:var(--muted);transition:all .15s;border-radius:0}
+.mob-nav-item:hover,.mob-nav-item.active{background:var(--surface);color:var(--text)}
+.mob-nav-item.active{border-left:3px solid var(--accent)}
+.mob-nav-icon{font-size:17px;width:22px;text-align:center}
+.mob-nav-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;padding:14px 16px 4px}
+.mob-nav-bottom{margin-top:auto;padding:16px}
 </style>
 </head>
 <body>
 
+<!-- Desktop header -->
 <header>
   <img src="/logo.png" style="width:28px;height:28px;border-radius:8px;object-fit:cover" alt="Nexia">
   <h1>Nexia Admin</h1>
@@ -140,6 +151,58 @@ input::placeholder{color:var(--muted)}
     <button class="btn-sm" onclick="doLogout()">← Sair</button>
   </div>
 </header>
+
+<!-- Mobile header -->
+<div class="mob-header">
+  <button class="hamburger" onclick="openDrawer()">☰</button>
+  <img src="/logo.png" style="width:26px;height:26px;border-radius:7px;object-fit:cover" alt="">
+  <span style="font-size:15px;font-weight:600">Nexia Admin</span>
+  <span class="badge" id="roleBadgeMob" style="margin-left:4px"></span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span id="headerEmailMob" style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  </div>
+</div>
+
+<!-- Mobile overlay + drawer -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeDrawer()"></div>
+<div class="mob-drawer" id="mobDrawer">
+  <div class="mob-drawer-header">
+    <img src="/logo.png" style="width:32px;height:32px;border-radius:9px;object-fit:cover">
+    <div>
+      <div style="font-size:14px;font-weight:600">Nexia Admin</div>
+      <div id="drawerEmail" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <div class="mob-nav-label">Geral</div>
+  <div class="mob-nav-item active" onclick="showTab('dashboard');closeDrawer()" id="mbnDashboard">
+    <span class="mob-nav-icon">📊</span><span>Dashboard</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('users');closeDrawer()" id="mbnUsers">
+    <span class="mob-nav-icon">👥</span><span>Usuários</span>
+  </div>
+
+  <div class="mob-nav-label" id="mbnLabelConfig" style="display:none">Configuração</div>
+  <div class="mob-nav-item" onclick="showTab('apikeys');closeDrawer()" id="mbnApikeys" style="display:none">
+    <span class="mob-nav-icon">🔑</span><span>API Keys</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('backup');closeDrawer()" id="mbnBackup" style="display:none">
+    <span class="mob-nav-icon">🔄</span><span>Backup Keys</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('theme');closeDrawer()" id="mbnTheme" style="display:none">
+    <span class="mob-nav-icon">🎨</span><span>Tema</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('database');closeDrawer()" id="mbnDatabase" style="display:none">
+    <span class="mob-nav-icon">🗄️</span><span>Banco de Dados</span>
+  </div>
+
+  <div class="mob-nav-bottom">
+    <a href="/chat.html" style="display:flex;align-items:center;gap:10px;background:rgba(25,195,125,.1);border:1px solid rgba(25,195,125,.2);border-radius:10px;padding:12px 14px;color:var(--text);text-decoration:none;font-size:14px">
+      <span style="font-size:18px">💬</span><span>Abrir Chat</span>
+    </a>
+    <button onclick="doLogout()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">← Sair</button>
+  </div>
+</div>
 
 <div class="layout">
   <nav class="sidenav">
@@ -448,6 +511,15 @@ input::placeholder{color:var(--muted)}
 <script>
 let me = null, statsData = null;
 
+function openDrawer(){
+  document.getElementById('mobDrawer').classList.add('open');
+  document.getElementById('mobOverlay').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('mobDrawer').classList.remove('open');
+  document.getElementById('mobOverlay').classList.remove('show');
+}
+
 function showTab(name) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -464,14 +536,20 @@ async function init() {
   me = await r.json();
   if (me.role==='user'){window.location.href='/chat.html';return;}
   document.getElementById('headerEmail').textContent = me.email;
+    document.getElementById('headerEmailMob').textContent = me.email;
+    document.getElementById('drawerEmail').textContent = me.email;
+    const mobBadge = document.getElementById('roleBadgeMob');
+    if(mobBadge){ mobBadge.textContent = me.role==='creator'?'👑 Criador':me.role==='admin'?'🛡 Admin':'👤 Usuário'; mobBadge.className='badge '+(me.role==='creator'?'creator':'admin'); }
   const badge = document.getElementById('roleBadge');
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
-    ['bnApikeys','bnBackup','bnTheme','bnDatabase'].forEach(id=>{
+    ['mbnApikeys','mbnBackup','mbnTheme','mbnDatabase'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.style.display='flex';
     });
+    const lbl = document.getElementById('mbnLabelConfig');
+    if(lbl) lbl.style.display='block';
     ['navLabelConfig','navApikeys','navBackup','navTheme','navDatabase'].forEach(id=>{
       document.getElementById(id).style.display='';
     });
@@ -723,13 +801,5 @@ async function doLogout(){await fetch('/api/logout',{method:'POST'});window.loca
 
 init();
 </script>
-<div class="bottom-nav" id="bottomNav">
-  <div class="bn-item active" onclick="showTab('dashboard')" id="bnDashboard"><span class="bn-icon">📊</span>Início</div>
-  <div class="bn-item" onclick="showTab('users')" id="bnUsers"><span class="bn-icon">👥</span>Usuários</div>
-  <div class="bn-item" onclick="showTab('apikeys')" id="bnApikeys" style="display:none"><span class="bn-icon">🔑</span>API Keys</div>
-  <div class="bn-item" onclick="showTab('backup')" id="bnBackup" style="display:none"><span class="bn-icon">🔄</span>Backup</div>
-  <div class="bn-item" onclick="showTab('theme')" id="bnTheme" style="display:none"><span class="bn-icon">🎨</span>Tema</div>
-  <div class="bn-item" onclick="showTab('database')" id="bnDatabase" style="display:none"><span class="bn-icon">🗄️</span>Database</div>
-</div>
 </body>
 </html>
