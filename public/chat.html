@@ -518,13 +518,32 @@ async function send(){
       const codeBlocks = extractCodeBlocks(d.reply);
       const hasZip = codeBlocks.length > 0;
 
+      // Strip image tags from reply no matter what
+      const cleanReply = (d.reply||'')
+        .replace(/\[GERAR_IMAGEM:[^\]]*\]/gi,'')
+        .replace(/\[GENERATE_IMAGE:[^\]]*\]/gi,'')
+        .replace(/\[IMAGE:[^\]]*\]/gi,'')
+        .replace(/##IMG##[\s\S]*?##ENDIMG##/gi,'')
+        .trim();
+
+      // Also detect image request from user message
+      const lastMsg = (history[history.length-1]?.content||'').toLowerCase();
+      const wantsImage = /imagem|foto|desenho|ilustra|crie.*foto|gere.*foto|gera.*imagem|cria.*imagem/i.test(lastMsg);
+
       if(d.imageUrl){
-        if(d.reply) addMsg('ai', d.reply, provider);
+        if(cleanReply) addMsg('ai', cleanReply, provider);
         showGeneratedImage(d.imageUrl);
+      } else if(wantsImage && !hasZip){
+        // Backend antigo ainda rodando - gera imagem no frontend com o texto da IA como prompt
+        if(cleanReply) addMsg('ai', cleanReply, provider);
+        // Extrai prompt da tag se existir, senão usa mensagem do usuário
+        const tagMatch = (d.reply||'').match(/\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i);
+        const imgPrompt = tagMatch ? tagMatch[1].trim() : lastMsg;
+        generateImageFrontend(imgPrompt);
       } else if(hasZip){
         addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
       } else {
-        addMsg('ai', d.reply, provider);
+        if(cleanReply) addMsg('ai', cleanReply, provider);
       }
       history.push({role:'assistant',content:d.reply});
 
@@ -670,6 +689,22 @@ function showTyping(){
   const col=provColors[provider]||'var(--accent)';
   d.innerHTML=`<div class="typing-inner"><div class="msg-av" style="background:${col};width:28px;height:28px;border-radius:4px;overflow:hidden;flex-shrink:0"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover"></div><div class="tdots"><span></span><span></span><span></span></div></div>`;
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
+}
+
+async function generateImageFrontend(prompt){
+  const msgs = document.getElementById('messages');
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'msg-row ai';
+  loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
+  msgs.appendChild(loadDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+  const seed = Math.floor(Math.random()*99999);
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux&width=512&height=512&nologo=true&seed=${seed}`;
+  const img = new Image();
+  const timer = setTimeout(()=>{ loadDiv.remove(); addMsg('ai','❌ Tempo esgotado. Tente novamente.',provider); }, 40000);
+  img.onload = ()=>{ clearTimeout(timer); loadDiv.remove(); showGeneratedImage(imgUrl); };
+  img.onerror = ()=>{ clearTimeout(timer); loadDiv.remove(); addMsg('ai','❌ Não consegui gerar. Tente novamente.',provider); };
+  img.src = imgUrl;
 }
 
 function showGeneratedImage(imgUrl, attempt=1){
