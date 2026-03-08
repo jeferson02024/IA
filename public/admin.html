@@ -214,12 +214,7 @@ input::placeholder{color:var(--muted)}
       </div>
       <div class="section" style="padding:0;overflow:hidden">
         <div style="overflow-x:auto">
-          <table class="users-table">
-            <thead><tr>
-              <th>Email</th><th>Papel</th><th>Keys</th><th>Conversas</th><th>Último acesso</th><th>Cadastro</th><th>Ações</th>
-            </tr></thead>
-            <tbody id="usersTbody"><tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Carregando...</td></tr></tbody>
-          </table>
+<div id="usersTbody" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
         </div>
       </div>
     </div>
@@ -678,7 +673,7 @@ async function clearConversations(){
 async function loadUsers(){
   const r=await fetch('/api/admin/users');const users=await r.json();
   const byUser=statsData?.byUser||[];const tbody=document.getElementById('usersTbody');
-  if(!users.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Nenhum usuário.</td></tr>';return;}
+  if(!users.length){tbody.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhum usuário.</div>';return;}
   tbody.innerHTML=users.map(u=>{
     const now=Math.floor(Date.now()/1000),ago=u.last_seen?now-u.last_seen:null;
     const onlineStr=!ago?'<span style="color:var(--muted);font-size:11px">nunca</span>':ago<300?'<span style="color:#19c37d;font-size:11px">● online</span>':ago<3600?`<span style="color:#f5a623;font-size:11px">há ${Math.floor(ago/60)}min</span>`:ago<86400?`<span style="color:var(--muted);font-size:11px">há ${Math.floor(ago/3600)}h</span>`:`<span style="color:var(--muted);font-size:11px">${new Date(u.last_seen*1000).toLocaleDateString('pt-BR')}</span>`;
@@ -692,15 +687,21 @@ async function loadUsers(){
       acts.push(`<button class="btn-role" onclick="resetPwd(${u.id},'${u.email}')">🔑</button>`);
     }
     if(u.role!=='creator')acts.push(`<button class="btn-del" onclick="delUser(${u.id},'${u.email}')">Remover</button>`);
-    return `<tr>
-      <td style="font-size:12px">${u.email}</td>
-      <td><span class="role-badge role-${u.role}">${roleLabel}</span></td>
-      <td><div style="display:flex;gap:4px;flex-wrap:wrap">${keysHtml}</div></td>
-      <td style="color:var(--muted);font-size:12px">${stat?stat.convs:'—'}</td>
-      <td>${onlineStr}</td>
-      <td style="color:var(--muted);font-size:12px">${new Date(u.created_at*1000).toLocaleDateString('pt-BR')}</td>
-      <td><div class="act-btns">${acts.join('')||'—'}</div></td>
-    </tr>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${u.email}</span>
+          <span class="role-badge role-${u.role}">${roleLabel}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">${onlineStr}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${keysHtml}</div>
+        <span style="color:var(--muted);font-size:11px">💬 ${stat?stat.convs:'0'} conv</span>
+        <span style="color:var(--muted);font-size:11px">📅 ${new Date(u.created_at*1000).toLocaleDateString('pt-BR')}</span>
+      </div>
+      ${acts.length?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap" class="act-btns">${acts.join('')}</div>`:''}
+    </div>`;
   }).join('');
 }
 
