@@ -499,17 +499,32 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é um assistente prestativo. Responda em português.'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é um assistente prestativo. Responda em português. Quando o usuário pedir para criar, gerar ou desenhar uma imagem, responda com uma frase curta e inclua exatamente no final: [GERAR_IMAGEM: descrição detalhada em inglês da imagem solicitada].'})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
     if(!r.ok){addMsg('ai','❌ '+d.error,provider);history.pop();}
     else{
-      addMsg('ai',d.reply,provider);
-      history.push({role:'assistant',content:d.reply});
-      // Se a resposta tem blocos de código, adiciona botão Baixar ZIP
+      // Detecta se a IA quer gerar uma imagem
+      const imgMatch = d.reply.match(/\[GERAR_IMAGEM:\s*(.+?)\]/i);
       const codeBlocks = extractCodeBlocks(d.reply);
-      if(codeBlocks.length > 0){
+      const hasZip = codeBlocks.length > 0;
+
+      if(imgMatch){
+        const prompt = imgMatch[1].trim();
+        const cleanReply = d.reply.replace(/\[GERAR_IMAGEM:\s*.+?\]/i, '').trim();
+        if(cleanReply) addMsg('ai', cleanReply, provider);
+        generateImage(prompt);
+      } else if(hasZip){
+        // Só mostra mensagem curta + botão ZIP, sem mostrar o código
+        addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
+      } else {
+        addMsg('ai', d.reply, provider);
+      }
+      history.push({role:'assistant',content:d.reply});
+
+      // Botão ZIP
+      if(hasZip){
         const wrap = document.createElement('div');
         wrap.className = 'zip-download-wrap';
         const btn = document.createElement('button');
@@ -650,6 +665,55 @@ function showTyping(){
   const col=provColors[provider]||'var(--accent)';
   d.innerHTML=`<div class="typing-inner"><div class="msg-av" style="background:${col};width:28px;height:28px;border-radius:4px;overflow:hidden;flex-shrink:0"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover"></div><div class="tdots"><span></span><span></span><span></span></div></div>`;
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
+}
+
+async function generateImage(prompt){
+  const c = document.getElementById('messages');
+  // Show loading
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'msg-row ai';
+  loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
+  c.appendChild(loadDiv);
+  c.scrollTop = c.scrollHeight;
+
+  const encodedPrompt = encodeURIComponent(prompt);
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true`;
+
+  const img = new Image();
+  img.onload = () => {
+    loadDiv.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-row ai';
+    wrap.innerHTML = `
+      <div class="msg-inner">
+        <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
+        <div class="msg-body">
+          <div class="gen-img-wrap">
+            <img src="${imgUrl}" class="gen-img" alt="${prompt}">
+            <button class="img-download-btn" onclick="downloadImage('${imgUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
+          </div>
+        </div>
+      </div>`;
+    c.appendChild(wrap);
+    c.scrollTop = c.scrollHeight;
+  };
+  img.onerror = () => {
+    loadDiv.remove();
+    addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
+  };
+  img.src = imgUrl;
+}
+
+async function downloadImage(url, filename){
+  const r = await fetch(url);
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.style.display='none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1000);
 }
 
 function extractCodeBlocks(text){
