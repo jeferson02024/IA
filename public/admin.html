@@ -236,26 +236,22 @@ input::placeholder{color:var(--muted)}
           <div><div class="api-card-title">Nexia (OpenRouter)</div><div class="api-card-sub">50+ modelos gratuitos</div></div>
         </div>
         <div class="key-status"><div class="kdot" id="openrouterDot" style="background:#333"></div><span id="openrouterInfo">Verificando...</span></div>
+        <div class="field">
+          <label>Modelo padrão</label>
+          <select id="openrouterModel">
+            <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (grátis)</option>
+            <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (grátis)</option>
+            <option value="deepseek/deepseek-r1:free">DeepSeek R1 (grátis)</option>
+            <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek Chat V3 (grátis)</option>
+            <option value="mistralai/mistral-7b-instruct:free">Mistral 7B (grátis)</option>
+            <option value="qwen/qwen3-8b:free">Qwen3 8B (grátis)</option>
+            <option value="google/gemma-3-27b-it:free">Gemma 3 27B (grátis)</option>
+          </select>
+        </div>
         <div class="field"><label>API Key (sk-or-...)</label><input type="password" id="openrouterKeyInput" placeholder="Cole a key do OpenRouter..."/></div>
         <button style="background:#7c3aed;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveOpenRouter()">Salvar Nexia</button>
       </div>
 
-      <div class="api-card" style="border-color:rgba(0,180,216,.2)">
-        <div class="api-card-header">
-          <div class="api-icon" style="background:rgba(0,180,216,.15)">🔵</div>
-          <div><div class="api-card-title">DeepSeek</div><div class="api-card-sub">Gratuito</div></div>
-        </div>
-        <div class="key-status"><div class="kdot" id="deepseekDot" style="background:#333"></div><span id="deepseekInfo">Verificando...</span></div>
-        <div class="field">
-          <label>Modelo padrão</label>
-          <select id="deepseekModel">
-            <option value="deepseek-chat">DeepSeek Chat</option>
-            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
-          </select>
-        </div>
-        <div class="field"><label>API Key (sk-...)</label><input type="password" id="deepseekKeyInput" placeholder="Cole a key do DeepSeek..."/></div>
-        <button style="background:#00b4d8;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveDeepSeek()">Salvar DeepSeek</button>
-      </div>
 
     </div>
   </div>
@@ -410,8 +406,9 @@ async function saveGemini() {
 
 async function saveOpenRouter() {
   const openrouterKey = document.getElementById('openrouterKeyInput').value.trim();
+  const openrouterModel = document.getElementById('openrouterModel').value;
   if (!openrouterKey) return toast('Cole a API key do OpenRouter.','err');
-  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({openrouterKey})});
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({openrouterKey, openrouterModel})});
   if (!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('openrouterKeyInput').value='';
   toast('✅ Key Nexia salva!','ok'); loadConfig();
