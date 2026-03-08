@@ -508,7 +508,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia. Responda em português. SIGA ESTAS REGRAS OBRIGATÓRIAS:\n1. Se pedirem IMAGEM/FOTO/DESENHO: responda com texto curto E termine com exatamente: ##IMG## descrição em inglês ##ENDIMG##\n2. Se pedirem SITE/APP/SISTEMA/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown (```html, ```css, ```js, ```python etc), sem texto, sem explicação, sem código Python para criar arquivos.\nNUNCA misture as regras.'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\\n1. IMAGEM/FOTO/DESENHO/ILUSTRAÇÃO: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG## — nunca repita a descrição em português, nunca coloque a tag em linha separada.\\n2. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\\nNUNCA exiba a tag ##IMG## como texto visível ao usuário.'}))
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
@@ -782,7 +782,7 @@ function showGeneratedImage(imgUrl, attempt=1){
         <div class="msg-body">
           <div class="gen-img-wrap">
             <img src="${url}" class="gen-img" alt="imagem gerada">
-            <button class="img-download-btn" onclick="baixarImagem('${safeUrl}')">⬇️ Baixar imagem</button>
+            <button class="img-download-btn" onclick="baixarImagem('${safeUrl}', this)">⬇️ Baixar imagem</button>
           </div>
         </div>
       </div>`;
@@ -801,34 +801,23 @@ function showGeneratedImage(imgUrl, attempt=1){
   img.src = url;
 }
 
-function baixarImagem(url){
+function baixarImagem(url, btnEl){
   const filename = 'nexia-imagem-' + Date.now() + '.png';
-  if(url.startsWith('data:')){
-    try {
-      const arr = url.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      const u8arr = new Uint8Array(bstr.length);
-      for(let i=0;i<bstr.length;i++) u8arr[i] = bstr.charCodeAt(i);
-      const blob = new Blob([u8arr], {type: mime});
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl; a.download = filename; a.style.display='none';
-      document.body.appendChild(a); a.click();
-      setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 2000);
-      // Fallback para APK/WebView: abre nova aba com botão de salvar
-      setTimeout(()=>{
-        const w = window.open('','_blank');
-        if(w) w.document.write(`<html><body style="margin:0;background:#000;text-align:center"><p style="color:#fff;font-family:sans-serif">Pressione e segure na imagem para salvar</p><img src="${url}" style="max-width:100vw"/></body></html>`);
-      }, 800);
-    } catch(e) {
-      window.open(url, '_blank');
-    }
-  } else {
+  try {
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.style.display='none';
     document.body.appendChild(a); a.click();
     setTimeout(()=> document.body.removeChild(a), 1000);
+    // Mostra dica inline para APK
+    if(btnEl){
+      const dica = document.createElement('p');
+      dica.style.cssText='color:#aaa;font-size:12px;margin:4px 0 0;';
+      dica.textContent='💡 Se não baixar, pressione e segure a imagem para salvar';
+      btnEl.parentNode.insertBefore(dica, btnEl.nextSibling);
+      setTimeout(()=> dica.remove(), 5000);
+    }
+  } catch(e) {
+    alert('Pressione e segure na imagem para salvar.');
   }
 }
 
