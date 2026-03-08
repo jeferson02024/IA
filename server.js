@@ -382,9 +382,38 @@ app.post('/api/chat', auth, async (req,res) => {
     }
 
     if (imagePrompt) {
-      const seed = Math.floor(Math.random()*99999);
-      // Send prompt to frontend - browser has no timeout limit
       const shortPrompt = imagePrompt.slice(0, 300);
+      try {
+        const cfAccRow = await q("SELECT value FROM config WHERE key='cf_account_id'");
+        const cfTokRow = await q("SELECT value FROM config WHERE key='cf_api_token'");
+        const CF_ACCOUNT = cfAccRow.rows[0]?.value;
+        const CF_TOKEN = cfTokRow.rows[0]?.value;
+        if (CF_ACCOUNT && CF_TOKEN) {
+          console.log('[image] gerando via Cloudflare AI:', shortPrompt.slice(0,60));
+          const cfRes = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+            {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${CF_TOKEN}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: shortPrompt }),
+              signal: AbortSignal.timeout(30000)
+            }
+          );
+          if (cfRes.ok) {
+            const buf = await cfRes.arrayBuffer();
+            const b64 = Buffer.from(buf).toString('base64');
+            console.log('[image] Cloudflare sucesso, size:', buf.byteLength);
+            return res.json({ reply: cleanReply, imageUrl: `data:image/png;base64,${b64}` });
+          } else {
+            const err = await cfRes.text();
+            console.error('[image] Cloudflare erro:', cfRes.status, err.slice(0,100));
+          }
+        } else {
+          console.log('[image] sem keys CF configuradas');
+        }
+      } catch(e) {
+        console.error('[image] Cloudflare falhou:', e.message);
+      }
       return res.json({ reply: cleanReply, imageUrl: null, imagePrompt: shortPrompt });
     }
 
