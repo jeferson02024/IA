@@ -425,7 +425,7 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (geminiKey) await upsert('global_gemini_key', geminiKey);
     if (groqModel) await upsert('global_groq_model', groqModel);
     if (geminiModel) await upsert('global_gemini_model', geminiModel);
-    const {mistralKey, mistralModel, openrouterKey, deepseekKey} = req.body;
+    const {mistralKey, mistralModel, openrouterKey, togetherKey} = req.body;
     if (mistralKey) await upsert('global_mistral_key', mistralKey);
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
     if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
