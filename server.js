@@ -98,6 +98,7 @@ async function initDB() {
     expires_at BIGINT NOT NULL
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_openrouter_key TEXT`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen BIGINT DEFAULT 0`);
   console.log('✅ Banco pronto!');
 }
 
@@ -105,7 +106,12 @@ function signToken(u) { return jwt.sign({ id:u.id, email:u.email, role:u.role },
 function auth(req,res,next) {
   const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ','');
   if (!token) return res.status(401).json({ error:'Não autenticado.' });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    // Update last_seen async (don't await to not slow down requests)
+    pool.query('UPDATE users SET last_seen=$1 WHERE id=$2', [Math.floor(Date.now()/1000), req.user.id]).catch(()=>{});
+    next();
+  }
   catch { res.status(401).json({ error:'Sessão expirada.' }); }
 }
 function role(...roles) {
@@ -404,7 +410,7 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key','theme_accent','theme_bg','theme_sidebar','theme_surface')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
@@ -413,6 +419,7 @@ app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
       mistralKeyMasked: cfg.global_mistral_key?cfg.global_mistral_key.slice(0,8)+'••••':null, hasMistralKey:!!cfg.global_mistral_key, mistralModel:cfg.global_mistral_model||'mistral-large-latest',
       openrouterKeyMasked: cfg.global_openrouter_key?cfg.global_openrouter_key.slice(0,8)+'••••':null, hasOpenrouterKey:!!cfg.global_openrouter_key,
       togetherKeyMasked: cfg.global_together_key?cfg.global_together_key.slice(0,8)+'••••':null, hasTogetherKey:!!cfg.global_together_key,
+      theme: { accent: cfg.theme_accent||'#19c37d', bg: cfg.theme_bg||'#0f0f0f', sidebar: cfg.theme_sidebar||'#171717', surface: cfg.theme_surface||'#1e1e1e' },
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -430,13 +437,18 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
     if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
     if (togetherKey) await upsert('global_together_key', togetherKey);
+    const {accentColor, bgColor, sidebarColor, surfaceColor} = req.body;
+    if (accentColor) await upsert('theme_accent', accentColor);
+    if (bgColor) await upsert('theme_bg', bgColor);
+    if (sidebarColor) await upsert('theme_sidebar', sidebarColor);
+    if (surfaceColor) await upsert('theme_surface', surfaceColor);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.get('/api/admin/users', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q('SELECT id,email,role,created_at,personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users ORDER BY created_at DESC');
+    const r = await q('SELECT id,email,role,created_at,last_seen,personal_groq_key,personal_gemini_key,personal_openrouter_key FROM users ORDER BY created_at DESC');
     res.json(r.rows.map(u=>({...u,hasGroqKey:!!u.personal_groq_key,hasGeminiKey:!!u.personal_gemini_key,hasOpenrouterKey:!!u.personal_openrouter_key,hasDeepseekKey:!!u.personal_deepseek_key,personal_groq_key:undefined,personal_gemini_key:undefined,personal_openrouter_key:undefined,personal_deepseek_key:undefined})));
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -539,6 +551,29 @@ app.post('/api/reset-password', async (req,res) => {
     await q('UPDATE users SET password=$1 WHERE id=$2', [require('bcryptjs').hashSync(newPassword,10), rt.user_id]);
     await q('DELETE FROM reset_tokens WHERE token=$1', [token]);
     res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/theme', async (req,res) => {
+  try {
+    const r = await q("SELECT key,value FROM config WHERE key IN ('theme_accent','theme_bg','theme_sidebar','theme_surface')");
+    const t = {};
+    r.rows.forEach(row => t[row.key] = row.value);
+    res.json({ accent: t.theme_accent||'#19c37d', bg: t.theme_bg||'#0f0f0f', sidebar: t.theme_sidebar||'#171717', surface: t.theme_surface||'#1e1e1e' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/online', auth, role('creator','admin'), async (req,res) => {
+  try {
+    const fiveMin = Math.floor(Date.now()/1000) - 300;
+    const thirtyMin = Math.floor(Date.now()/1000) - 1800;
+    const online = await q('SELECT id,email,role,last_seen FROM users WHERE last_seen>$1 ORDER BY last_seen DESC', [fiveMin]);
+    const recent = await q('SELECT id,email,role,last_seen FROM users WHERE last_seen>$1 AND last_seen<=$2 ORDER BY last_seen DESC', [thirtyMin, fiveMin]);
+    const hourly = await q(`SELECT EXTRACT(HOUR FROM TO_TIMESTAMP(updated_at)) as hour, COUNT(*) as c
+      FROM conversations
+      WHERE updated_at > EXTRACT(EPOCH FROM NOW()) - 86400
+      GROUP BY hour ORDER BY hour`);
+    res.json({ online: online.rows, recent: recent.rows, hourly: hourly.rows });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
