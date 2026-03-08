@@ -171,9 +171,6 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
         <button class="provider-btn" id="btnOpenrouter" onclick="setProvider('openrouter')" style="border-color:rgba(124,58,237,.3)">
           <div class="pdot" style="background:#7c3aed;box-shadow:0 0 6px #7c3aed"></div>Nexia<span style="margin-left:auto;font-size:10px;color:var(--muted)">50+ modelos</span>
         </button>
-        <button class="provider-btn" id="btnDeepseek" onclick="setProvider('deepseek')" style="border-color:rgba(0,180,216,.3)">
-          <div class="pdot" style="background:#00b4d8;box-shadow:0 0 6px #00b4d8"></div>DeepSeek<span style="margin-left:auto;font-size:10px;color:var(--muted)">Grátis</span>
-        </button>
       </div>
       <div class="model-wrap">
         <select class="model-select" id="modelSelect" onchange="model=this.value"></select>
@@ -275,11 +272,10 @@ const models={
   groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama-3.2-90b-vision-preview','llama-3.2-11b-vision-preview','llama-guard-3-8b'],
   gemini:['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro'],
   mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b'],
-  openrouter:['meta-llama/llama-4-scout:free','meta-llama/llama-4-maverick:free','deepseek/deepseek-r1:free','google/gemini-2.0-flash-exp:free','mistralai/mistral-7b-instruct:free','qwen/qwen2.5-72b-instruct:free'],
-  deepseek:['deepseek-chat','deepseek-reasoner']
+  openrouter:['meta-llama/llama-4-scout:free','meta-llama/llama-4-maverick:free','deepseek/deepseek-r1:free','deepseek/deepseek-chat-v3-0324:free','mistralai/mistral-7b-instruct:free','qwen/qwen3-8b:free','google/gemma-3-27b-it:free'],
 };
 
-const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed',deepseek:'#00b4d8'};
+const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed'};
 
 function setProvider(p){
   provider=p;
