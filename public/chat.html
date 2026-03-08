@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0f0f0f;--sidebar:#171717;--surface:#1e1e1e;--border:#2a2a2a;--input-bg:#2f2f2f;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#7c3aed;--deepseek:#00b4d8;--purple:#a855f7}
+:root{--bg:#0f0f0f;--sidebar:#171717;--surface:#1e1e1e;--border:#2a2a2a;--input-bg:#2f2f2f;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#4f8ef7;--deepseek:#00b4d8;--purple:#a855f7}
 html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
 .layout{display:flex;height:100vh;overflow:hidden}
 .sidebar{width:260px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
@@ -72,9 +72,10 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .msg-av{width:28px;height:28px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;margin-top:2px;overflow:hidden}
 .msg-row.user .msg-av{background:#5436da;color:#fff}
 .msg-row.ai .msg-av{background:var(--accent)}
-.msg-row.ai.openrouter .msg-av{background:var(--blue)}
-.msg-row.ai.deepseek .msg-av{background:var(--deepseek)}
+.msg-row.ai.gemini .msg-av{background:var(--blue)}
 .msg-row.ai.mistral .msg-av{background:#ff7000}
+.msg-row.ai.openrouter .msg-av{background:#7c3aed}
+.msg-row.ai.deepseek .msg-av{background:#00b4d8}
 .msg-body{flex:1;font-size:15px;line-height:1.75;color:var(--text);min-width:0}
 .msg-body p{margin-bottom:10px}
 .msg-body p:last-child{margin-bottom:0}
@@ -270,7 +271,7 @@ const models={
   mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b']
 };
 
-const provColors={groq:'var(--accent)',openrouter:'var(--blue)',deepseek:'var(--deepseek)',mistral:'#ff7000'};
+const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed',deepseek:'#00b4d8'};
 
 function setProvider(p){
   provider=p;

@@ -42,8 +42,7 @@ header h1{font-size:16px;font-weight:600}
 .pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px}
 .pill-dot{width:7px;height:7px;border-radius:50%}
 .pill-dot.groq{background:var(--accent)}
-.pill-dot.openrouter{background:var(--blue)}
-.pill-dot.deepseek{background:#00b4d8}
+.pill-dot.gemini{background:var(--blue)}
 .pill-dot.model{background:var(--purple)}
 .pill-count{color:var(--muted);font-size:11px}
 /* API cards */
@@ -52,15 +51,13 @@ header h1{font-size:16px;font-weight:600}
 .api-card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .api-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .api-icon.groq{background:rgba(25,195,125,.15)}
-.api-icon.openrouter{background:rgba(124,58,237,.15)}
-.api-icon.deepseek{background:rgba(0,180,216,.15)}
+.api-icon.gemini{background:rgba(79,142,247,.15)}
 .api-card-title{font-size:14px;font-weight:600}
 .api-card-sub{font-size:11px;color:var(--muted)}
 .key-status{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--muted)}
 .kdot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0}
 .kdot.on.groq{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-.kdot.on.openrouter{background:var(--blue);box-shadow:0 0 6px var(--blue)}
-.kdot.on.deepseek{background:#00b4d8;box-shadow:0 0 6px #00b4d8}
+.kdot.on.gemini{background:var(--blue);box-shadow:0 0 6px var(--blue)}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
 label{font-size:12px;color:var(--muted)}
 input,select{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s;width:100%}
@@ -68,10 +65,8 @@ input:focus{border-color:var(--accent)}
 input::placeholder{color:var(--muted)}
 .btn-groq{background:var(--accent);border:none;border-radius:8px;padding:9px 16px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%}
 .btn-groq:hover{filter:brightness(1.1)}
-.btn-openrouter{background:var(--blue);border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%}
-.btn-openrouter:hover{filter:brightness(1.1)}
-.btn-deepseek{background:#00b4d8;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%}
-.btn-deepseek:hover{filter:brightness(1.1)}
+.btn-gemini{background:var(--blue);border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%}
+.btn-gemini:hover{filter:brightness(1.1)}
 /* Users table */
 .users-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .btn-add{background:var(--accent);border:none;border-radius:8px;padding:8px 14px;color:#000;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer}
@@ -86,8 +81,7 @@ input::placeholder{color:var(--muted)}
 .keys-badges{display:flex;gap:4px;flex-wrap:wrap}
 .kb{font-size:10px;border-radius:4px;padding:2px 6px;font-weight:600}
 .kb.groq{background:rgba(25,195,125,.15);color:var(--accent)}
-.kb.openrouter{background:rgba(124,58,237,.15);color:var(--blue)}
-.kb.deepseek{background:rgba(0,180,216,.15);color:#00b4d8}
+.kb.gemini{background:rgba(79,142,247,.15);color:var(--blue)}
 .kb.none{background:rgba(107,114,128,.1);color:var(--muted)}
 .act-btns{display:flex;gap:6px;flex-wrap:wrap}
 .btn-role{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;cursor:pointer}
@@ -137,7 +131,7 @@ input::placeholder{color:var(--muted)}
     <div class="chat-access-icon">💬</div>
     <div>
       <div class="chat-access-text">Abrir Chat</div>
-      <div class="chat-access-sub">Acesse o chat com Groq, Nexia e DeepSeek</div>
+      <div class="chat-access-sub">Acesse o chat com Groq e Gemini</div>
     </div>
     <span style="margin-left:auto;color:var(--muted);font-size:18px">→</span>
   </a>
@@ -336,13 +330,11 @@ async function loadConfig() {
   if (!r.ok) return;
   const d = await r.json();
   document.getElementById('groqDot').classList.toggle('on', d.hasGroqKey);
-  document.getElementById('openrouterDot').classList.toggle('on', d.hasOpenrouterKey);
-  document.getElementById('deepseekDot').classList.toggle('on', d.hasDeepseekKey);
+  document.getElementById('geminiDot').classList.toggle('on', d.hasGeminiKey);
   document.getElementById('groqInfo').textContent = d.hasGroqKey ? `✅ ${d.groqKeyMasked}` : 'Nenhuma key configurada';
-  document.getElementById('openrouterInfo').textContent = d.hasOpenrouterKey ? `✅ ${d.openrouterKeyMasked}` : 'Nenhuma key configurada';
-  document.getElementById('deepseekInfo').textContent = d.hasDeepseekKey ? `✅ ${d.deepseekKeyMasked}` : 'Nenhuma key configurada';
+  document.getElementById('geminiInfo').textContent = d.hasGeminiKey ? `✅ ${d.geminiKeyMasked}` : 'Nenhuma key configurada';
   if (d.groqModel) document.getElementById('groqModel').value = d.groqModel;
-
+  if (d.geminiModel) document.getElementById('geminiModel').value = d.geminiModel;
   const mDot = document.getElementById('mistralDot');
   if (mDot) {
     mDot.style.background = d.hasMistralKey ? '#ff7000' : '#333';
@@ -370,6 +362,16 @@ async function saveMistral() {
   if (!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('mistralKeyInput').value='';
   toast('✅ Key do Mistral salva!','ok'); loadConfig();
+}
+
+async function saveGemini() {
+  const geminiKey = document.getElementById('geminiKeyInput').value.trim();
+  const geminiModel = document.getElementById('geminiModel').value;
+  if (!geminiKey) return toast('Cole a API key do Gemini.','err');
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({geminiKey,geminiModel})});
+  if (!r.ok) return toast('Erro ao salvar.','err');
+  document.getElementById('geminiKeyInput').value='';
+  toast('✅ Key do Gemini salva!','ok'); loadConfig();
 }
 
 async function saveOpenRouter() {
