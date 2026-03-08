@@ -8,17 +8,9 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-const nodemailer = require('nodemailer');
-const mailer = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.GMAIL_USER || 'nexiasuporte646@gmail.com',
-    pass: process.env.GMAIL_PASS || 'lqfuxaeqdihhpcvh'
-  },
-  tls: { rejectUnauthorized: false }
-});
+const Brevo = require('@getbrevo/brevo');
+const brevoClient = new Brevo.TransactionalEmailsApi();
+brevoClient.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || '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');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '932508182659-gevg6ph5ief33eq5jq532bqib6g4n3hb.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
@@ -462,11 +454,11 @@ app.post('/api/forgot-password', async (req,res) => {
     await q('INSERT INTO reset_tokens (token,user_id,expires_at) VALUES ($1,$2,$3)', [token, user.id, expires]);
     const link = `${BASE_URL}/reset-password.html?token=${token}`;
     console.log('📧 Enviando email para:', email);
-    const mailResult = await mailer.sendMail({
-      from: '"Nexia Suporte" <nexiasuporte646@gmail.com>',
-      to: email,
-      subject: 'Redefinir senha — Nexia',
-      html: `
+    const sendSmtpEmail = new Brevo.SendSmtpEmail();
+    sendSmtpEmail.sender = { name: 'Nexia Suporte', email: 'nexiasuporte646@gmail.com' };
+    sendSmtpEmail.to = [{ email }];
+    sendSmtpEmail.subject = 'Redefinir senha — Nexia';
+    sendSmtpEmail.htmlContent = `
         <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;background:#0f0f0f;color:#ececec;border-radius:16px;padding:32px;border:1px solid #2a2a2a">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
             <div style="width:36px;height:36px;background:#19c37d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🤖</div>
@@ -477,9 +469,9 @@ app.post('/api/forgot-password', async (req,res) => {
           <a href="${link}" style="display:inline-block;background:#19c37d;color:#000;text-decoration:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:15px">Redefinir senha</a>
           <p style="color:#555;margin:24px 0 0;font-size:12px">Se você não solicitou isso, ignore este email.</p>
         </div>
-      `
-    });
-    console.log('✅ Email enviado:', mailResult.messageId);
+      `;
+    const mailResult = await brevoClient.sendTransacEmail(sendSmtpEmail);
+    console.log('✅ Email enviado:', mailResult.body?.messageId || 'ok');
     res.json({ ok:true });
   } catch(e) { console.error('❌ Erro email:', e.message); res.status(500).json({ error: e.message }); }
 });
