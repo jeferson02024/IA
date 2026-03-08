@@ -8,9 +8,17 @@ const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-const Brevo = require('@getbrevo/brevo');
-const brevoClient = new Brevo.TransactionalEmailsApi();
-brevoClient.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || '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');
+const nodemailer = require('nodemailer');
+const mailer = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.GMAIL_USER || 'nexiasuporte646@gmail.com',
+    pass: process.env.GMAIL_PASS || 'lqfuxaeqdihhpcvh'
+  },
+  tls: { rejectUnauthorized: false }
+});
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '932508182659-gevg6ph5ief33eq5jq532bqib6g4n3hb.apps.googleusercontent.com';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
@@ -62,8 +70,8 @@ passport.use(new GoogleStrategy({
 async function initDB() {
   await q(`CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'user', personal_groq_key TEXT, personal_openrouter_key TEXT, personal_deepseek_key TEXT,
-    personal_mistral_key TEXT,
+    role TEXT NOT NULL DEFAULT 'user', personal_groq_key TEXT, personal_gemini_key TEXT,
+    personal_mistral_key TEXT, personal_openrouter_key TEXT, personal_deepseek_key TEXT,
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
@@ -81,6 +89,7 @@ async function initDB() {
     console.log('✅ Criador criado');
   }
   if (process.env.GROQ_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_groq_key', process.env.GROQ_API_KEY]);
+  if (process.env.GEMINI_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_gemini_key', process.env.GEMINI_API_KEY]);
   if (process.env.OPENROUTER_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_openrouter_key', process.env.OPENROUTER_API_KEY]);
   if (process.env.DEEPSEEK_API_KEY) await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO NOTHING', ['global_deepseek_key', process.env.DEEPSEEK_API_KEY]);
   await q(`CREATE TABLE IF NOT EXISTS reset_tokens (
@@ -88,6 +97,8 @@ async function initDB() {
     user_id INTEGER NOT NULL,
     expires_at BIGINT NOT NULL
   )`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_openrouter_key TEXT`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_deepseek_key TEXT`);
   console.log('✅ Banco pronto!');
 }
 
@@ -131,20 +142,21 @@ app.post('/api/logout', (req,res) => { res.clearCookie('token'); res.json({ ok:t
 
 app.get('/api/me', auth, async (req,res) => {
   try {
-    const r = await q('SELECT id,email,role,personal_groq_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
+    const r = await q('SELECT id,email,role,personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
     const user = r.rows[0];
-    res.json({ id:user.id, email:user.email, role:user.role, hasGroqKey:!!user.personal_groq_key, hasOpenrouterKey:!!user.personal_openrouter_key, hasDeepseekKey:!!user.personal_deepseek_key, hasMistralKey:!!user.personal_mistral_key });
+    res.json({ id:user.id, email:user.email, role:user.role, hasGroqKey:!!user.personal_groq_key, hasGeminiKey:!!user.personal_gemini_key, hasMistralKey:!!user.personal_mistral_key, hasOpenrouterKey:!!user.personal_openrouter_key, hasDeepseekKey:!!user.personal_deepseek_key });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/my-key', auth, async (req,res) => {
   try {
-    const {groqKey,openrouterKey,deepseekKey} = req.body;
+    const {groqKey,geminiKey} = req.body;
     if (groqKey!==undefined) await q('UPDATE users SET personal_groq_key=$1 WHERE id=$2', [groqKey||null, req.user.id]);
+    if (geminiKey!==undefined) await q('UPDATE users SET personal_gemini_key=$1 WHERE id=$2', [geminiKey||null, req.user.id]);
+    const {mistralKey, openrouterKey, deepseekKey} = req.body;
+    if (mistralKey!==undefined) await q('UPDATE users SET personal_mistral_key=$1 WHERE id=$2', [mistralKey||null, req.user.id]);
     if (openrouterKey!==undefined) await q('UPDATE users SET personal_openrouter_key=$1 WHERE id=$2', [openrouterKey||null, req.user.id]);
     if (deepseekKey!==undefined) await q('UPDATE users SET personal_deepseek_key=$1 WHERE id=$2', [deepseekKey||null, req.user.id]);
-    const {mistralKey} = req.body;
-    if (mistralKey!==undefined) await q('UPDATE users SET personal_mistral_key=$1 WHERE id=$2', [mistralKey||null, req.user.id]);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -269,28 +281,34 @@ app.post('/api/chat', auth, async (req,res) => {
   try {
     const {messages, systemPrompt, provider, model, conversationId} = req.body;
     if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
-    const ur = await q('SELECT personal_groq_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
+    const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
     const userData = ur.rows[0];
     let apiKey;
     if (provider==='groq') {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_groq_key']);
       apiKey = userData?.personal_groq_key || ck.rows[0]?.value || process.env.GROQ_API_KEY;
       if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Groq configurada.' });
+    } else if (provider==='gemini') {
+      const ck = await q('SELECT value FROM config WHERE key=$1', ['global_gemini_key']);
+      apiKey = userData?.personal_gemini_key || ck.rows[0]?.value || process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Gemini configurada.' });
     } else if (provider==='openrouter') {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_openrouter_key']);
       apiKey = userData?.personal_openrouter_key || ck.rows[0]?.value || process.env.OPENROUTER_API_KEY;
+      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do OpenRouter configurada.' });
     } else if (provider==='deepseek') {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_deepseek_key']);
       apiKey = userData?.personal_deepseek_key || ck.rows[0]?.value || process.env.DEEPSEEK_API_KEY;
-      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Gemini configurada.' });
+      if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do DeepSeek configurada.' });
     } else {
       const ck = await q('SELECT value FROM config WHERE key=$1', ['global_mistral_key']);
       apiKey = userData?.personal_mistral_key || ck.rows[0]?.value || process.env.MISTRAL_API_KEY;
       if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Mistral configurada.' });
     }
-    const defaultModels = {groq:'llama-3.3-70b-versatile', openrouter:'meta-llama/llama-4-scout:free', deepseek:'deepseek-chat', mistral:'mistral-large-latest'};
+    const defaultModels = {groq:'llama-3.3-70b-versatile',gemini:'gemini-2.0-flash',openrouter:'meta-llama/llama-4-scout:free',deepseek:'deepseek-chat',mistral:'mistral-large-latest'};
     const usedModel = model || defaultModels[provider] || 'llama-3.3-70b-versatile';
     const reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt)
+      : provider==='gemini' ? await callGemini(apiKey, usedModel, messages, systemPrompt)
       : provider==='openrouter' ? await callOpenRouter(apiKey, usedModel, messages, systemPrompt)
       : provider==='deepseek' ? await callDeepSeek(apiKey, usedModel, messages, systemPrompt)
       : await callMistral(apiKey, usedModel, messages, systemPrompt);
@@ -327,26 +345,34 @@ async function callMistral(apiKey, model, messages, sys) {
   return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
 }
 
+async function callGemini(apiKey, model, messages, sys) {
+  const contents = messages.map(m => ({ role:m.role==='assistant'?'model':'user', parts:[{text:m.content}] }));
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ system_instruction:{parts:[{text:sys||'Você é um assistente prestativo. Responda em português.'}]}, contents, generationConfig:{maxOutputTokens:2048,temperature:0.7} })
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`Gemini erro ${r.status}`); }
+  return (await r.json()).candidates?.[0]?.content?.parts?.[0]?.text||'Sem resposta.';
+}
+
+
 async function callOpenRouter(apiKey, model, messages, sys) {
-  const msgs = [{role:'system',content:sys||'Você é Nexia, uma IA assistente prestativa. Responda em português.'},...messages];
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,'HTTP-Referer':'https://ia-2-uvqg.onrender.com','X-Title':'Nexia'},
-    body: JSON.stringify({ model, messages:msgs, max_tokens:2048, temperature:0.7 })
+    body: JSON.stringify({ model, messages:[{role:'system',content:sys||'Você é Nexia, uma IA assistente prestativa. Responda em português.'},...messages], max_tokens:2048, temperature:0.7 })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`OpenRouter erro ${r.status}`); }
   return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
 }
 
 async function callDeepSeek(apiKey, model, messages, sys) {
-  const msgs = [{role:'system',content:sys||'Você é Nexia, uma IA assistente prestativa. Responda em português.'},...messages];
   const r = await fetch('https://api.deepseek.com/chat/completions', {
     method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
-    body: JSON.stringify({ model, messages:msgs, max_tokens:2048, temperature:0.7 })
+    body: JSON.stringify({ model, messages:[{role:'system',content:sys||'Você é Nexia, uma IA assistente prestativa. Responda em português.'},...messages], max_tokens:2048, temperature:0.7 })
   });
   if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`DeepSeek erro ${r.status}`); }
   return (await r.json()).choices?.[0]?.message?.content||'Sem resposta.';
 }
-
 
 app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
   try {
@@ -379,36 +405,40 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_openrouter_key','global_deepseek_key','global_groq_model','global_mistral_key','global_mistral_model')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_deepseek_key')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
       groqKeyMasked: cfg.global_groq_key?cfg.global_groq_key.slice(0,8)+'••••':null, hasGroqKey:!!cfg.global_groq_key, groqModel:cfg.global_groq_model||'llama-3.3-70b-versatile',
-      openrouterKeyMasked: cfg.global_openrouter_key?cfg.global_openrouter_key.slice(0,8)+'••••':null, hasOpenrouterKey:!!cfg.global_openrouter_key, deepseekKeyMasked: cfg.global_deepseek_key?cfg.global_deepseek_key.slice(0,8)+'••••':null, hasDeepseekKey:!!cfg.global_deepseek_key,
+      geminiKeyMasked: cfg.global_gemini_key?cfg.global_gemini_key.slice(0,8)+'••••':null, hasGeminiKey:!!cfg.global_gemini_key, geminiModel:cfg.global_gemini_model||'gemini-2.0-flash',
       mistralKeyMasked: cfg.global_mistral_key?cfg.global_mistral_key.slice(0,8)+'••••':null, hasMistralKey:!!cfg.global_mistral_key, mistralModel:cfg.global_mistral_model||'mistral-large-latest',
+      openrouterKeyMasked: cfg.global_openrouter_key?cfg.global_openrouter_key.slice(0,8)+'••••':null, hasOpenrouterKey:!!cfg.global_openrouter_key,
+      deepseekKeyMasked: cfg.global_deepseek_key?cfg.global_deepseek_key.slice(0,8)+'••••':null, hasDeepseekKey:!!cfg.global_deepseek_key,
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
   try {
-    const {groqKey,openrouterKey,deepseekKey,groqModel} = req.body;
+    const {groqKey,geminiKey,groqModel,geminiModel} = req.body;
     const upsert = (k,v) => q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2', [k,v]);
     if (groqKey) await upsert('global_groq_key', groqKey);
-    if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
-    if (deepseekKey) await upsert('global_deepseek_key', deepseekKey);
+    if (geminiKey) await upsert('global_gemini_key', geminiKey);
     if (groqModel) await upsert('global_groq_model', groqModel);
-    const {mistralKey, mistralModel} = req.body;
+    if (geminiModel) await upsert('global_gemini_model', geminiModel);
+    const {mistralKey, mistralModel, openrouterKey, deepseekKey} = req.body;
     if (mistralKey) await upsert('global_mistral_key', mistralKey);
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
+    if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
+    if (deepseekKey) await upsert('global_deepseek_key', deepseekKey);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.get('/api/admin/users', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q('SELECT id,email,role,created_at,personal_groq_key,personal_openrouter_key,personal_deepseek_key FROM users ORDER BY created_at DESC');
-    res.json(r.rows.map(u=>({...u,hasGroqKey:!!u.personal_groq_key,hasGeminiKey:!!u.personal_gemini_key,personal_groq_key:undefined,personal_gemini_key:undefined})));
+    const r = await q('SELECT id,email,role,created_at,personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users ORDER BY created_at DESC');
+    res.json(r.rows.map(u=>({...u,hasGroqKey:!!u.personal_groq_key,hasGeminiKey:!!u.personal_gemini_key,hasOpenrouterKey:!!u.personal_openrouter_key,hasDeepseekKey:!!u.personal_deepseek_key,personal_groq_key:undefined,personal_gemini_key:undefined,personal_openrouter_key:undefined,personal_deepseek_key:undefined})));
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
@@ -473,11 +503,11 @@ app.post('/api/forgot-password', async (req,res) => {
     await q('INSERT INTO reset_tokens (token,user_id,expires_at) VALUES ($1,$2,$3)', [token, user.id, expires]);
     const link = `${BASE_URL}/reset-password.html?token=${token}`;
     console.log('📧 Enviando email para:', email);
-    const sendSmtpEmail = new Brevo.SendSmtpEmail();
-    sendSmtpEmail.sender = { name: 'Nexia Suporte', email: 'nexiasuporte646@gmail.com' };
-    sendSmtpEmail.to = [{ email }];
-    sendSmtpEmail.subject = 'Redefinir senha — Nexia';
-    sendSmtpEmail.htmlContent = `
+    const mailResult = await mailer.sendMail({
+      from: '"Nexia Suporte" <nexiasuporte646@gmail.com>',
+      to: email,
+      subject: 'Redefinir senha — Nexia',
+      html: `
         <div style="font-family:Inter,sans-serif;max-width:480px;margin:0 auto;background:#0f0f0f;color:#ececec;border-radius:16px;padding:32px;border:1px solid #2a2a2a">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px">
             <div style="width:36px;height:36px;background:#19c37d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🤖</div>
@@ -488,9 +518,9 @@ app.post('/api/forgot-password', async (req,res) => {
           <a href="${link}" style="display:inline-block;background:#19c37d;color:#000;text-decoration:none;border-radius:10px;padding:12px 24px;font-weight:700;font-size:15px">Redefinir senha</a>
           <p style="color:#555;margin:24px 0 0;font-size:12px">Se você não solicitou isso, ignore este email.</p>
         </div>
-      `;
-    const mailResult = await brevoClient.sendTransacEmail(sendSmtpEmail);
-    console.log('✅ Email enviado:', mailResult.body?.messageId || 'ok');
+      `
+    });
+    console.log('✅ Email enviado:', mailResult.messageId);
     res.json({ ok:true });
   } catch(e) { console.error('❌ Erro email:', e.message); res.status(500).json({ error: e.message }); }
 });
