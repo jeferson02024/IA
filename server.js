@@ -376,17 +376,25 @@ app.post('/api/chat', auth, async (req,res) => {
     const imgKeywords = ['imagem','foto','desenho','ilustração','crie uma foto','gere uma foto','gerar imagem','criar imagem'];
     const askedForImage = imgKeywords.some(k => lastUserMsg.includes(k));
     if (!imagePrompt && askedForImage) {
-      // Usa a resposta da IA como prompt traduzido
-      const shortReply = cleanReply.replace(/[^\w\s,]/g,'').slice(0, 200);
-      imagePrompt = shortReply || lastUserMsg;
+      // Usa a mensagem do usuário como prompt - não mostra texto descritivo
+      imagePrompt = lastUserMsg;
       cleanReply = '';
     }
 
     if (imagePrompt) {
       const seed = Math.floor(Math.random()*99999);
-      // Use model=flux for better reliability
       const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(imagePrompt) + '?model=flux&width=512&height=512&nologo=true&seed=' + seed;
-      return res.json({ reply: cleanReply, imageUrl: imgUrl });
+      try {
+        const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(40000) });
+        if (!imgRes.ok) throw new Error('status ' + imgRes.status);
+        const buf = await imgRes.arrayBuffer();
+        const b64 = Buffer.from(buf).toString('base64');
+        const mime = imgRes.headers.get('content-type') || 'image/jpeg';
+        return res.json({ reply: cleanReply, imageUrl: `data:${mime};base64,${b64}` });
+      } catch(imgErr) {
+        console.error('[image]', imgErr.message);
+        return res.json({ reply: cleanReply, imageUrl: imgUrl });
+      }
     }
 
     res.json({ reply });
