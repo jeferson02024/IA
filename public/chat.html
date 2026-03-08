@@ -275,6 +275,15 @@ const models={
   openrouter:['openrouter/auto','openrouter/free'],
 };
 
+// Load and apply theme
+fetch('/api/theme').then(r=>r.json()).then(t=>{
+  const root = document.documentElement;
+  root.style.setProperty('--accent', t.accent);
+  root.style.setProperty('--bg', t.bg);
+  root.style.setProperty('--sidebar', t.sidebar);
+  root.style.setProperty('--surface', t.surface);
+}).catch(()=>{});
+
 const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed'};
 
 function setProvider(p){

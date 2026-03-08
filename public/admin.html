@@ -111,6 +111,23 @@ input::placeholder{color:var(--muted)}
 .btn-primary{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.api-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}}
+.online-section{margin-top:20px}
+.online-title{font-size:12px;color:var(--muted);margin-bottom:10px}
+.online-list{display:flex;flex-direction:column;gap:6px}
+.online-row{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:8px;padding:8px 12px}
+.online-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.online-dot.now{background:#19c37d;box-shadow:0 0 6px #19c37d;animation:pulse 1.5s infinite}
+.online-dot.recent{background:#f5a623}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.online-email{font-size:13px;flex:1}
+.online-time{font-size:11px;color:var(--muted)}
+.hourly-chart{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px}
+.hourly-bar{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;transition:height .3s;cursor:default;position:relative}
+.hourly-bar:hover::after{content:attr(data-tip);position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;white-space:nowrap;color:var(--text)}
+.hourly-labels{display:flex;gap:4px;margin-top:4px}
+.hourly-label{flex:1;text-align:center;font-size:9px;color:var(--muted)}
+.color-preset{width:26px;height:26px;border-radius:6px;cursor:pointer;transition:transform .15s;flex-shrink:0}
+.color-preset:hover{transform:scale(1.2)}
 </style>
 </head>
 <body>
@@ -153,6 +170,19 @@ input::placeholder{color:var(--muted)}
       <div class="chart-wrap">
         <div class="chart-bars" id="chartBars"></div>
       </div>
+    </div>
+
+    <!-- Online agora -->
+    <div class="online-section">
+      <div class="online-title">🟢 Online agora <span id="onlineCount" style="color:#19c37d;font-weight:600"></span></div>
+      <div class="online-list" id="onlineList"><div style="font-size:12px;color:var(--muted)">Carregando...</div></div>
+    </div>
+
+    <!-- Gráfico por hora hoje -->
+    <div style="margin-top:20px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">⏱ Mensagens por hora (hoje)</div>
+      <div class="hourly-chart" id="hourlyChart"></div>
+      <div class="hourly-labels" id="hourlyLabels"></div>
     </div>
 
     <!-- Provedores e modelos mais usados -->
@@ -250,6 +280,104 @@ input::placeholder{color:var(--muted)}
 
 
     </div>
+  </div>
+
+  <!-- Tema -->
+  <div class="section">
+    <div class="section-title">🎨 Personalização do Tema</div>
+    <div class="section-sub">Mude as cores da plataforma para todos os usuários</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="api-card">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px">Cor de destaque</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="color" id="themeAccent" value="#19c37d" style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;background:none">
+          <div>
+            <div style="font-size:13px;font-weight:600" id="themeAccentLabel">#19c37d</div>
+            <div style="font-size:11px;color:var(--muted)">Botões, links, ativo</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap" id="accentPresets">
+          <div class="color-preset" style="background:#19c37d" data-target="themeAccent" data-val="#19c37d"></div>
+          <div class="color-preset" style="background:#7c3aed" data-target="themeAccent" data-val="#7c3aed"></div>
+          <div class="color-preset" style="background:#4f8ef7" data-target="themeAccent" data-val="#4f8ef7"></div>
+          <div class="color-preset" style="background:#f43f5e" data-target="themeAccent" data-val="#f43f5e"></div>
+          <div class="color-preset" style="background:#f5a623" data-target="themeAccent" data-val="#f5a623"></div>
+          <div class="color-preset" style="background:#06b6d4" data-target="themeAccent" data-val="#06b6d4"></div>
+          <div class="color-preset" style="background:#a855f7" data-target="themeAccent" data-val="#a855f7"></div>
+          <div class="color-preset" style="background:#ff7000" data-target="themeAccent" data-val="#ff7000"></div>
+        </div>
+      </div>
+      <div class="api-card">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px">Cor de fundo</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="color" id="themeBg" value="#0f0f0f" style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;background:none">
+          <div>
+            <div style="font-size:13px;font-weight:600" id="themeBgLabel">#0f0f0f</div>
+            <div style="font-size:11px;color:var(--muted)">Fundo principal</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+          <div class="color-preset" style="background:#0f0f0f;border:1px solid #333" data-target="themeBg" data-val="#0f0f0f"></div>
+          <div class="color-preset" style="background:#0a0a0a;border:1px solid #333" data-target="themeBg" data-val="#0a0a0a"></div>
+          <div class="color-preset" style="background:#111827" data-target="themeBg" data-val="#111827"></div>
+          <div class="color-preset" style="background:#0d1117" data-target="themeBg" data-val="#0d1117"></div>
+          <div class="color-preset" style="background:#1a1a2e" data-target="themeBg" data-val="#1a1a2e"></div>
+          <div class="color-preset" style="background:#0f172a" data-target="themeBg" data-val="#0f172a"></div>
+        </div>
+      </div>
+      <div class="api-card">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px">Cor da sidebar</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="color" id="themeSidebar" value="#171717" style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;background:none">
+          <div>
+            <div style="font-size:13px;font-weight:600" id="themeSidebarLabel">#171717</div>
+            <div style="font-size:11px;color:var(--muted)">Painel lateral</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+          <div class="color-preset" style="background:#171717;border:1px solid #333" data-target="themeSidebar" data-val="#171717"></div>
+          <div class="color-preset" style="background:#1c1c1c;border:1px solid #333" data-target="themeSidebar" data-val="#1c1c1c"></div>
+          <div class="color-preset" style="background:#161b22" data-target="themeSidebar" data-val="#161b22"></div>
+          <div class="color-preset" style="background:#1e1b4b" data-target="themeSidebar" data-val="#1e1b4b"></div>
+          <div class="color-preset" style="background:#1a1a2e" data-target="themeSidebar" data-val="#1a1a2e"></div>
+        </div>
+      </div>
+      <div class="api-card">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px">Cor dos cards</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="color" id="themeSurface" value="#1e1e1e" style="width:44px;height:44px;border:none;border-radius:8px;cursor:pointer;background:none">
+          <div>
+            <div style="font-size:13px;font-weight:600" id="themeSurfaceLabel">#1e1e1e</div>
+            <div style="font-size:11px;color:var(--muted)">Cards e modais</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+          <div class="color-preset" style="background:#1e1e1e;border:1px solid #333" data-target="themeSurface" data-val="#1e1e1e"></div>
+          <div class="color-preset" style="background:#242424;border:1px solid #333" data-target="themeSurface" data-val="#242424"></div>
+          <div class="color-preset" style="background:#21262d" data-target="themeSurface" data-val="#21262d"></div>
+          <div class="color-preset" style="background:#1e1b4b" data-target="themeSurface" data-val="#1e1b4b"></div>
+          <div class="color-preset" style="background:#1e293b" data-target="themeSurface" data-val="#1e293b"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div style="margin-top:16px;padding:16px;border-radius:12px;border:1px solid var(--border)" id="themePreview">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Prévia</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div id="prevBg" style="width:60px;height:40px;border-radius:8px;border:1px solid #333"></div>
+        <div id="prevSidebar" style="width:60px;height:40px;border-radius:8px"></div>
+        <div id="prevSurface" style="width:60px;height:40px;border-radius:8px"></div>
+        <div id="prevAccent" style="width:60px;height:40px;border-radius:8px"></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <div id="prevBtn" style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;color:#000">Botão</div>
+        <div id="prevBadge" style="padding:6px 14px;border-radius:20px;font-size:12px;border:1px solid #333">Badge</div>
+      </div>
+    </div>
+
+    <button onclick="saveTheme()" style="margin-top:16px;width:100%;background:var(--accent);border:none;border-radius:8px;padding:12px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💾 Aplicar tema para todos</button>
+    <button onclick="resetTheme()" style="margin-top:8px;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">↺ Restaurar padrão</button>
   </div>
 
   <!-- Usuários -->
@@ -363,6 +491,13 @@ async function loadConfig() {
   const orDot = document.getElementById('openrouterDot');
   if(orDot){ orDot.style.background = d.hasOpenrouterKey?'#7c3aed':'#333'; orDot.style.boxShadow = d.hasOpenrouterKey?'0 0 6px #7c3aed':'none'; }
   document.getElementById('openrouterInfo').textContent = d.hasOpenrouterKey ? '✅ '+d.openrouterKeyMasked : 'Nenhuma key configurada';
+  if(d.theme){
+    document.getElementById('themeAccent').value = d.theme.accent;
+    document.getElementById('themeBg').value = d.theme.bg;
+    document.getElementById('themeSidebar').value = d.theme.sidebar;
+    document.getElementById('themeSurface').value = d.theme.surface;
+    updatePreview();
+  }
   const tDot = document.getElementById('togetherDot');
   if(tDot){ tDot.style.background = d.hasTogetherKey?'#f5a623':'#333'; tDot.style.boxShadow = d.hasTogetherKey?'0 0 6px #f5a623':'none'; }
   if(document.getElementById('togetherInfo')) document.getElementById('togetherInfo').textContent = d.hasTogetherKey ? '✅ '+d.togetherKeyMasked : 'Nenhuma key configurada';
@@ -403,6 +538,61 @@ async function saveGemini() {
   toast('✅ Key do Gemini salva!','ok'); loadConfig();
 }
 
+function updatePreview(){
+  const accent = document.getElementById('themeAccent').value;
+  const bg = document.getElementById('themeBg').value;
+  const sidebar = document.getElementById('themeSidebar').value;
+  const surface = document.getElementById('themeSurface').value;
+  document.getElementById('prevAccent').style.background = accent;
+  document.getElementById('prevBg').style.background = bg;
+  document.getElementById('prevSidebar').style.background = sidebar;
+  document.getElementById('prevSurface').style.background = surface;
+  document.getElementById('prevBtn').style.background = accent;
+  document.getElementById('prevBadge').style.borderColor = accent;
+  document.getElementById('prevBadge').style.color = accent;
+  document.getElementById('themeAccentLabel').textContent = accent;
+  document.getElementById('themeBgLabel').textContent = bg;
+  document.getElementById('themeSidebarLabel').textContent = sidebar;
+  document.getElementById('themeSurfaceLabel').textContent = surface;
+}
+
+function initThemeControls(){
+  ['themeAccent','themeBg','themeSidebar','themeSurface'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', updatePreview);
+  });
+  document.querySelectorAll('.color-preset').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const input = document.getElementById(el.dataset.target);
+      input.value = el.dataset.val;
+      updatePreview();
+    });
+  });
+  updatePreview();
+}
+
+async function saveTheme(){
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    accentColor: document.getElementById('themeAccent').value,
+    bgColor: document.getElementById('themeBg').value,
+    sidebarColor: document.getElementById('themeSidebar').value,
+    surfaceColor: document.getElementById('themeSurface').value
+  })});
+  if(!r.ok) return toast('Erro ao salvar tema.','err');
+  toast('✅ Tema aplicado para todos!','ok');
+}
+
+async function resetTheme(){
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    accentColor:'#19c37d', bgColor:'#0f0f0f', sidebarColor:'#171717', surfaceColor:'#1e1e1e'
+  })});
+  document.getElementById('themeAccent').value='#19c37d';
+  document.getElementById('themeBg').value='#0f0f0f';
+  document.getElementById('themeSidebar').value='#171717';
+  document.getElementById('themeSurface').value='#1e1e1e';
+  updatePreview();
+  toast('✅ Tema restaurado!','ok');
+}
+
 async function saveTogether() {
   const togetherKey = document.getElementById('togetherKeyInput').value.trim();
   if (!togetherKey) return toast('Cole a API key do Together.','err');
@@ -431,6 +621,47 @@ async function saveDeepSeek() {
   toast('✅ Key DeepSeek salva!','ok'); loadConfig();
 }
 
+async function loadOnline(){
+  try {
+    const r = await fetch('/api/admin/online');
+    if(!r.ok) return;
+    const d = await r.json();
+    const list = document.getElementById('onlineList');
+    const count = document.getElementById('onlineCount');
+    const all = [...(d.online||[]).map(u=>({...u,status:'now'})), ...(d.recent||[]).map(u=>({...u,status:'recent'}))];
+    count.textContent = d.online?.length ? `(${d.online.length})` : '';
+    if(!all.length){ list.innerHTML='<div style="font-size:12px;color:var(--muted)">Nenhum usuário ativo recentemente</div>'; }
+    else {
+      list.innerHTML = all.map(u=>{
+        const ago = Math.floor(Date.now()/1000) - u.last_seen;
+        const timeStr = ago < 60 ? 'agora mesmo' : ago < 3600 ? `há ${Math.floor(ago/60)} min` : `há ${Math.floor(ago/3600)}h`;
+        return `<div class="online-row">
+          <div class="online-dot ${u.status}"></div>
+          <span class="online-email">${u.email}</span>
+          <span class="online-time">${timeStr}</span>
+        </div>`;
+      }).join('');
+    }
+    // Hourly chart
+    const hourlyChart = document.getElementById('hourlyChart');
+    const hourlyLabels = document.getElementById('hourlyLabels');
+    const hourMap = {};
+    (d.hourly||[]).forEach(h => hourMap[parseInt(h.hour)] = parseInt(h.c));
+    const maxVal = Math.max(...Object.values(hourMap), 1);
+    const nowHour = new Date().getHours();
+    let barsHtml='', labelsHtml='';
+    for(let h=0;h<24;h++){
+      const val = hourMap[h]||0;
+      const pct = Math.round((val/maxVal)*100);
+      const isNow = h===nowHour;
+      barsHtml+=`<div class="hourly-bar" style="height:${Math.max(pct,2)}%;background:${isNow?'#19c37d':'var(--accent)'};opacity:${isNow?1:0.5}" data-tip="${h}h: ${val}"></div>`;
+      labelsHtml+=`<div class="hourly-label">${h%4===0?h+'h':''}</div>`;
+    }
+    hourlyChart.innerHTML = barsHtml;
+    hourlyLabels.innerHTML = labelsHtml;
+  } catch(e){}
+}
+
 async function loadUsers() {
   const r = await fetch('/api/admin/users');
   const users = await r.json();
@@ -439,6 +670,13 @@ async function loadUsers() {
   const tbody = document.getElementById('usersTbody');
   if (!users.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">Nenhum usuário.</td></tr>';return;}
   tbody.innerHTML = users.map(u => {
+    const now = Math.floor(Date.now()/1000);
+    const ago = u.last_seen ? now - u.last_seen : null;
+    const onlineStr = !ago ? '<span style="color:var(--muted);font-size:11px">nunca</span>'
+      : ago < 300 ? '<span style="color:#19c37d;font-size:11px">● online</span>'
+      : ago < 3600 ? `<span style="color:#f5a623;font-size:11px">há ${Math.floor(ago/60)}min</span>`
+      : ago < 86400 ? `<span style="color:var(--muted);font-size:11px">há ${Math.floor(ago/3600)}h</span>`
+      : `<span style="color:var(--muted);font-size:11px">${new Date(u.last_seen*1000).toLocaleDateString('pt-BR')}</span>`;
     const since = new Date(u.created_at*1000).toLocaleDateString('pt-BR');
     const roleLabel = u.role==='creator'?'👑 Criador':u.role==='admin'?'🛡 Admin':'👤 Usuário';
     const keysHtml = (u.hasGroqKey||u.hasGeminiKey)

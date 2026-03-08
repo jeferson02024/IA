@@ -304,6 +304,13 @@
       }
     })
     .catch(() => {});
+  // Load theme
+  fetch('/api/theme').then(r=>r.json()).then(t=>{
+    const root = document.documentElement;
+    root.style.setProperty('--accent', t.accent);
+    root.style.setProperty('--bg', t.bg);
+    root.style.setProperty('--surface', t.surface);
+  }).catch(()=>{});
 </script>
 </body>
 </html>
