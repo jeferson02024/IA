@@ -383,18 +383,27 @@ app.post('/api/chat', auth, async (req,res) => {
 
     if (imagePrompt) {
       const seed = Math.floor(Math.random()*99999);
-      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(imagePrompt) + '?model=flux&width=512&height=512&nologo=true&seed=' + seed;
-      try {
-        const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(40000) });
-        if (!imgRes.ok) throw new Error('status ' + imgRes.status);
-        const buf = await imgRes.arrayBuffer();
-        const b64 = Buffer.from(buf).toString('base64');
-        const mime = imgRes.headers.get('content-type') || 'image/jpeg';
-        return res.json({ reply: cleanReply, imageUrl: `data:${mime};base64,${b64}` });
-      } catch(imgErr) {
-        console.error('[image]', imgErr.message);
-        return res.json({ reply: cleanReply, imageUrl: imgUrl });
+      const apis = [
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?model=flux&width=512&height=512&nologo=true&seed=${seed}`,
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=512&height=512&nologo=true&seed=${seed}`,
+      ];
+      for (const imgUrl of apis) {
+        try {
+          console.log('[image] trying:', imgUrl.slice(0,80));
+          const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(45000) });
+          if (!imgRes.ok) throw new Error('status ' + imgRes.status);
+          const ct = imgRes.headers.get('content-type')||'';
+          if (!ct.startsWith('image/')) throw new Error('not an image: ' + ct);
+          const buf = await imgRes.arrayBuffer();
+          const b64 = Buffer.from(buf).toString('base64');
+          console.log('[image] success, size:', buf.byteLength);
+          return res.json({ reply: cleanReply, imageUrl: `data:${ct};base64,${b64}` });
+        } catch(imgErr) {
+          console.error('[image] failed:', imgErr.message);
+        }
       }
+      // All failed - tell frontend to try directly
+      return res.json({ reply: cleanReply, imageUrl: null, imagePrompt });
     }
 
     // Last resort: strip any remaining image tags from reply before sending
@@ -655,7 +664,7 @@ app.post('/api/reset-password', async (req,res) => {
 // Backup keys endpoints
 app.get('/api/admin/backup-keys', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q('SELECT id,provider,label,active,created_at,LEFT(key_value,8)||'••••' as key_masked FROM backup_keys ORDER BY provider,id');
+    const r = await q(`SELECT id,provider,label,active,created_at,LEFT(key_value,8)||'••••' as key_masked FROM backup_keys ORDER BY provider,id`);
     res.json(r.rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
