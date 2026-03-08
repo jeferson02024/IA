@@ -294,6 +294,7 @@ app.post('/api/chat', auth, async (req,res) => {
   try {
     const {messages: rawMessages, systemPrompt, provider, model, conversationId} = req.body;
     if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
+    console.log('[chat] provider:', provider, 'msgs:', (rawMessages||[]).length);
 
     // Sanitize messages: convert array content (image+text) to string only
     const messages = (rawMessages||[]).map(m => {
@@ -305,7 +306,7 @@ app.post('/api/chat', auth, async (req,res) => {
       if (typeof m.content !== 'string') return { ...m, content: String(m.content || '') };
       return m;
     });
-    const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
+    const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key,personal_mistral_key FROM users WHERE id=$1', [req.user.id]);
     const userData = ur.rows[0];
     let apiKey;
     if (provider==='groq') {
