@@ -533,10 +533,12 @@ async function send(){
       if(d.imageUrl){
         if(cleanReply) addMsg('ai', cleanReply, provider);
         showGeneratedImage(d.imageUrl);
-      } else if(wantsImage && !hasZip){
-        // Backend antigo ainda rodando - gera imagem no frontend com o texto da IA como prompt
+      } else if(d.imagePrompt){
+        // Backend detectou imagem mas falhou - frontend tenta
         if(cleanReply) addMsg('ai', cleanReply, provider);
-        // Extrai prompt da tag se existir, senão usa mensagem do usuário
+        generateImageFrontend(d.imagePrompt);
+      } else if(wantsImage && !hasZip){
+        if(cleanReply) addMsg('ai', cleanReply, provider);
         const tagMatch = (d.reply||'').match(/\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i);
         const imgPrompt = tagMatch ? tagMatch[1].trim() : lastMsg;
         generateImageFrontend(imgPrompt);
