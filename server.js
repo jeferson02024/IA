@@ -373,7 +373,7 @@ app.post('/api/chat', auth, async (req,res) => {
 
     // Se não achou tag mas usuário pediu imagem, detecta pela mensagem
     const lastUserMsg = (messages[messages.length-1]?.content||'').toLowerCase();
-    const imgKeywords = ['imagem','foto','desenho','ilustração','crie uma foto','gere uma foto','gerar imagem','criar imagem'];
+    const imgKeywords = ['imagem','foto','desenho','ilustração','crie uma foto','gere uma foto','gerar imagem','criar imagem','gea imagem','cria imagem','gera imagem','uma foto','uma imagem','um desenho'];
     const askedForImage = imgKeywords.some(k => lastUserMsg.includes(k));
     if (!imagePrompt && askedForImage) {
       // Usa a mensagem do usuário como prompt - não mostra texto descritivo
@@ -397,7 +397,14 @@ app.post('/api/chat', auth, async (req,res) => {
       }
     }
 
-    res.json({ reply });
+    // Last resort: strip any remaining image tags from reply before sending
+    const finalReply = reply
+      .replace(/\[GERAR_IMAGEM:[^\]]*\]/gi, '')
+      .replace(/\[GENERATE_IMAGE:[^\]]*\]/gi, '')
+      .replace(/\[IMAGE:[^\]]*\]/gi, '')
+      .replace(/##IMG##[\s\S]*?##ENDIMG##/gi, '')
+      .trim();
+    res.json({ reply: finalReply });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
