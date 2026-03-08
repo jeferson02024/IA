@@ -635,6 +635,12 @@ async function loadConfig() {
     const info = document.getElementById(k+'Info');
     if(info) info.textContent = has?`✅ ${d[k+'KeyMasked']}`:'Nenhuma key configurada';
   }
+  // Cloudflare status
+  const cfDot = document.getElementById('cfDot');
+  const cfInfo = document.getElementById('cfInfo');
+  if(cfDot){ cfDot.style.background=d.hasCfToken?'#f97316':'#333'; cfDot.style.boxShadow=d.hasCfToken?'0 0 6px #f97316':'none'; }
+  if(cfInfo) cfInfo.textContent = d.hasCfToken ? '✅ '+d.cfTokenMasked : 'Nenhuma key configurada';
+
   if(d.groqModel) document.getElementById('groqModel').value=d.groqModel;
   if(d.geminiModel) document.getElementById('geminiModel').value=d.geminiModel;
   if(d.mistralModel) document.getElementById('mistralModel').value=d.mistralModel;
@@ -678,8 +684,11 @@ async function saveMistral(){
 async function saveCF(){
   const cfAccountId = document.getElementById('cfAccountInput').value.trim();
   const cfApiToken = document.getElementById('cfTokenInput').value.trim();
-  if(!cfAccountId||!cfApiToken) return toast('Preencha Account ID e Token.','err');
-  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cfAccountId,cfApiToken})});
+  if(!cfAccountId && !cfApiToken) return toast('Preencha o Account ID e/ou Token.','err');
+  const body = {};
+  if(cfAccountId) body.cfAccountId = cfAccountId;
+  if(cfApiToken) body.cfApiToken = cfApiToken;
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('cfAccountInput').value='';
   document.getElementById('cfTokenInput').value='';
