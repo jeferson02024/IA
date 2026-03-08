@@ -693,19 +693,54 @@ function showTyping(){
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
 }
 
-async function generateImageFrontend(prompt){
+async function generateImageFrontend(prompt, attempt=1){
   const msgs = document.getElementById('messages');
-  const loadDiv = document.createElement('div');
-  loadDiv.className = 'msg-row ai';
-  loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
-  msgs.appendChild(loadDiv);
-  msgs.scrollTop = msgs.scrollHeight;
+  const loadDiv = document.getElementById('imgLoadDiv') || (() => {
+    const d = document.createElement('div');
+    d.id = 'imgLoadDiv'; d.className = 'msg-row ai';
+    d.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem... (pode levar até 30s)</p></div></div>`;
+    msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
+  })();
+
   const seed = Math.floor(Math.random()*99999);
-  const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux&width=512&height=512&nologo=true&seed=${seed}`;
+  // Try different models/sizes each attempt
+  const urls = [
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=turbo&width=256&height=256&nologo=true&seed=${seed}`,
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=flux-schnell&width=256&height=256&nologo=true&seed=${seed}`,
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&seed=${seed}`,
+  ];
+  const imgUrl = urls[(attempt-1) % urls.length];
+
   const img = new Image();
-  const timer = setTimeout(()=>{ loadDiv.remove(); addMsg('ai','❌ Tempo esgotado. Tente novamente.',provider); }, 40000);
-  img.onload = ()=>{ clearTimeout(timer); loadDiv.remove(); showGeneratedImage(imgUrl); };
-  img.onerror = ()=>{ clearTimeout(timer); loadDiv.remove(); addMsg('ai','❌ Não consegui gerar. Tente novamente.',provider); };
+  const timer = setTimeout(()=>{
+    img.src = '';
+    if(attempt < 4){
+      loadDiv.querySelector('p').textContent = `🎨 Tentativa ${attempt+1}/4...`;
+      generateImageFrontend(prompt, attempt+1);
+    } else {
+      loadDiv.remove();
+      document.getElementById('imgLoadDiv')?.remove();
+      addMsg('ai','❌ Não consegui gerar a imagem após várias tentativas.',provider);
+    }
+  }, 30000);
+
+  img.onload = ()=>{
+    clearTimeout(timer);
+    const el = document.getElementById('imgLoadDiv');
+    if(el) el.remove();
+    showGeneratedImage(imgUrl);
+  };
+  img.onerror = ()=>{
+    clearTimeout(timer);
+    if(attempt < 4){
+      loadDiv.querySelector('p').textContent = `🎨 Tentativa ${attempt+1}/4...`;
+      generateImageFrontend(prompt, attempt+1);
+    } else {
+      const el = document.getElementById('imgLoadDiv');
+      if(el) el.remove();
+      addMsg('ai','❌ Não consegui gerar a imagem.',provider);
+    }
+  };
   img.src = imgUrl;
 }
 
