@@ -508,24 +508,29 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, uma IA assistente. Responda sempre em português. REGRAS IMPORTANTES: 1) Quando o usuário pedir para CRIAR ou GERAR uma IMAGEM/FOTO/DESENHO, responda com UMA frase curta e coloque exatamente no final: [GERAR_IMAGEM: detailed description in english]. 2) Quando o usuário pedir para criar um SITE, APP, PROJETO ou ZIP, responda APENAS com os blocos de código usando ```html, ```css, ```js etc. SEM explicações, SEM código Python, SEM zipfile, SEM instruções de execução. Apenas os arquivos prontos.'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia. Responda em português. SIGA ESTAS REGRAS OBRIGATÓRIAS:\n1. Se pedirem IMAGEM/FOTO/DESENHO: responda com texto curto E termine com exatamente: ##IMG## descrição em inglês ##ENDIMG##\n2. Se pedirem SITE/APP/SISTEMA/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown (```html, ```css, ```js, ```python etc), sem texto, sem explicação, sem código Python para criar arquivos.\nNUNCA misture as regras.'})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
     if(!r.ok){addMsg('ai','❌ '+d.error,provider);history.pop();}
     else{
-      // Detecta se a IA quer gerar uma imagem
-      const imgMatch = d.reply.match(/\[GERAR_IMAGEM:\s*(.+?)\]/i);
+      // Detecta imagem via marcador ##IMG##
+      const imgStart = d.reply.indexOf('##IMG##');
+      const imgEnd = d.reply.indexOf('##ENDIMG##');
+      let imgPrompt = null;
+      let cleanReply = d.reply;
+      if(imgStart !== -1 && imgEnd !== -1){
+        imgPrompt = d.reply.slice(imgStart + 7, imgEnd).trim();
+        cleanReply = d.reply.slice(0, imgStart).trim();
+      }
+
       const codeBlocks = extractCodeBlocks(d.reply);
       const hasZip = codeBlocks.length > 0;
 
-      if(imgMatch){
-        const prompt = imgMatch[1].trim();
-        const cleanReply = d.reply.replace(/\[GERAR_IMAGEM:\s*.+?\]/i, '').trim();
+      if(imgPrompt){
         if(cleanReply) addMsg('ai', cleanReply, provider);
-        generateImage(prompt);
+        generateImage(imgPrompt);
       } else if(hasZip){
-        // Só mostra mensagem curta + botão ZIP, sem mostrar o código
         addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
       } else {
         addMsg('ai', d.reply, provider);
