@@ -384,7 +384,8 @@ app.post('/api/chat', auth, async (req,res) => {
 
     if (imagePrompt) {
       const seed = Math.floor(Math.random()*99999);
-      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(imagePrompt) + '?width=512&height=512&nologo=true&seed=' + seed;
+      // Use model=flux for better reliability
+      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(imagePrompt) + '?model=flux&width=512&height=512&nologo=true&seed=' + seed;
       return res.json({ reply: cleanReply, imageUrl: imgUrl });
     }
 
