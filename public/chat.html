@@ -499,7 +499,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é um assistente prestativo. Responda em português. Quando o usuário pedir para criar, gerar ou desenhar uma imagem, responda com uma frase curta e inclua exatamente no final: [GERAR_IMAGEM: descrição detalhada em inglês da imagem solicitada].'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, uma IA assistente. Responda sempre em português. REGRAS IMPORTANTES: 1) Quando o usuário pedir para CRIAR ou GERAR uma IMAGEM/FOTO/DESENHO, responda com UMA frase curta e coloque exatamente no final: [GERAR_IMAGEM: detailed description in english]. 2) Quando o usuário pedir para criar um SITE, APP, PROJETO ou ZIP, responda APENAS com os blocos de código usando ```html, ```css, ```js etc. SEM explicações, SEM código Python, SEM zipfile, SEM instruções de execução. Apenas os arquivos prontos.'})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
@@ -668,40 +668,45 @@ function showTyping(){
 }
 
 async function generateImage(prompt){
-  const c = document.getElementById('messages');
-  // Show loading
+  const msgs = document.getElementById('messages');
   const loadDiv = document.createElement('div');
   loadDiv.className = 'msg-row ai';
   loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
-  c.appendChild(loadDiv);
-  c.scrollTop = c.scrollHeight;
+  msgs.appendChild(loadDiv);
+  msgs.scrollTop = msgs.scrollHeight;
 
   const encodedPrompt = encodeURIComponent(prompt);
-  const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true`;
+  const seed = Math.floor(Math.random()*99999);
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
 
-  const img = new Image();
-  img.onload = () => {
+  try {
+    await new Promise((resolve, reject) => {
+      const img = new Image();
+      const timeout = setTimeout(() => reject(new Error('timeout')), 30000);
+      img.onload = () => { clearTimeout(timeout); resolve(); };
+      img.onerror = () => { clearTimeout(timeout); reject(new Error('error')); };
+      img.src = imgUrl;
+    });
     loadDiv.remove();
     const wrap = document.createElement('div');
     wrap.className = 'msg-row ai';
+    const safeUrl = imgUrl.replace(/'/g, '%27');
     wrap.innerHTML = `
       <div class="msg-inner">
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${imgUrl}" class="gen-img" alt="${prompt}">
-            <button class="img-download-btn" onclick="downloadImage('${imgUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
+            <img src="${imgUrl}" class="gen-img" alt="imagem gerada">
+            <button class="img-download-btn" onclick="downloadImage('${safeUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
           </div>
         </div>
       </div>`;
-    c.appendChild(wrap);
-    c.scrollTop = c.scrollHeight;
-  };
-  img.onerror = () => {
+    msgs.appendChild(wrap);
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(e) {
     loadDiv.remove();
     addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
-  };
-  img.src = imgUrl;
+  }
 }
 
 async function downloadImage(url, filename){
