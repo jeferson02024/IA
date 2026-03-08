@@ -351,6 +351,43 @@ app.post('/api/chat', auth, async (req,res) => {
           [JSON.stringify(updated), title, Math.floor(Date.now()/1000), conversationId]);
       }
     }
+    // Detecta pedido de imagem no reply e extrai prompt
+    let imagePrompt = null;
+    let cleanReply = reply;
+
+    // Suporta varios formatos que a IA pode usar
+    const patterns = [
+      /##IMG##([\s\S]+?)##ENDIMG##/i,
+      /\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i,
+      /\[GENERATE_IMAGE:\s*([\s\S]+?)\]/i,
+      /\[IMAGE:\s*([\s\S]+?)\]/i,
+    ];
+    for (const pat of patterns) {
+      const m = reply.match(pat);
+      if (m) {
+        imagePrompt = m[1].trim();
+        cleanReply = reply.replace(pat, '').trim();
+        break;
+      }
+    }
+
+    // Se não achou tag mas usuário pediu imagem, detecta pela mensagem
+    const lastUserMsg = (messages[messages.length-1]?.content||'').toLowerCase();
+    const imgKeywords = ['imagem','foto','desenho','ilustração','crie uma foto','gere uma foto','gerar imagem','criar imagem'];
+    const askedForImage = imgKeywords.some(k => lastUserMsg.includes(k));
+    if (!imagePrompt && askedForImage) {
+      // Usa a resposta da IA como prompt traduzido
+      const shortReply = cleanReply.replace(/[^\w\s,]/g,'').slice(0, 200);
+      imagePrompt = shortReply || lastUserMsg;
+      cleanReply = '';
+    }
+
+    if (imagePrompt) {
+      const seed = Math.floor(Math.random()*99999);
+      const imgUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(imagePrompt) + '?width=512&height=512&nologo=true&seed=' + seed;
+      return res.json({ reply: cleanReply, imageUrl: imgUrl });
+    }
+
     res.json({ reply });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -627,6 +664,14 @@ app.patch('/api/admin/backup-keys/:id', auth, role('creator','admin'), async (re
   try {
     await q('UPDATE backup_keys SET active=$1 WHERE id=$2', [req.body.active, req.params.id]);
     res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/clear-old-conversations', auth, role('creator'), async (req,res) => {
+  try {
+    const { cutoff } = req.body;
+    const r = await q('DELETE FROM conversations WHERE updated_at < $1', [cutoff]);
+    res.json({ deleted: r.rowCount });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
