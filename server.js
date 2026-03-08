@@ -383,27 +383,24 @@ app.post('/api/chat', auth, async (req,res) => {
 
     if (imagePrompt) {
       const seed = Math.floor(Math.random()*99999);
-      const apis = [
-        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?model=flux&width=512&height=512&nologo=true&seed=${seed}`,
-        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=512&height=512&nologo=true&seed=${seed}`,
-      ];
-      for (const imgUrl of apis) {
-        try {
-          console.log('[image] trying:', imgUrl.slice(0,80));
-          const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(45000) });
-          if (!imgRes.ok) throw new Error('status ' + imgRes.status);
-          const ct = imgRes.headers.get('content-type')||'';
-          if (!ct.startsWith('image/')) throw new Error('not an image: ' + ct);
-          const buf = await imgRes.arrayBuffer();
-          const b64 = Buffer.from(buf).toString('base64');
-          console.log('[image] success, size:', buf.byteLength);
-          return res.json({ reply: cleanReply, imageUrl: `data:${ct};base64,${b64}` });
-        } catch(imgErr) {
-          console.error('[image] failed:', imgErr.message);
-        }
+      // Use smaller image and short prompt for speed
+      const shortPrompt = imagePrompt.slice(0, 200);
+      const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(shortPrompt)}?model=turbo&width=384&height=384&nologo=true&seed=${seed}`;
+      console.log('[image] trying turbo:', imgUrl.slice(0,80));
+      try {
+        const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(25000) });
+        if (!imgRes.ok) throw new Error('status ' + imgRes.status);
+        const ct = imgRes.headers.get('content-type')||'';
+        if (!ct.startsWith('image/')) throw new Error('not an image: ' + ct);
+        const buf = await imgRes.arrayBuffer();
+        const b64 = Buffer.from(buf).toString('base64');
+        console.log('[image] success, size:', buf.byteLength);
+        return res.json({ reply: cleanReply, imageUrl: `data:${ct};base64,${b64}` });
+      } catch(imgErr) {
+        console.error('[image] failed:', imgErr.message);
+        // Send prompt to frontend - it will try directly from browser
+        return res.json({ reply: cleanReply, imageUrl: null, imagePrompt: shortPrompt });
       }
-      // All failed - tell frontend to try directly
-      return res.json({ reply: cleanReply, imageUrl: null, imagePrompt });
     }
 
     // Last resort: strip any remaining image tags from reply before sending
