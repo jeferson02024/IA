@@ -229,6 +229,34 @@ input::placeholder{color:var(--muted)}
         <div class="field"><label>API Key (api_...)</label><input type="password" id="mistralKeyInput" placeholder="Cole a key do Mistral..."/></div>
         <button style="background:#ff7000;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveMistral()">Salvar Mistral</button>
       </div>
+
+      <div class="api-card" style="border-color:rgba(124,58,237,.2)">
+        <div class="api-card-header">
+          <div class="api-icon" style="background:rgba(124,58,237,.15)">🌐</div>
+          <div><div class="api-card-title">Nexia (OpenRouter)</div><div class="api-card-sub">50+ modelos gratuitos</div></div>
+        </div>
+        <div class="key-status"><div class="kdot" id="openrouterDot" style="background:#333"></div><span id="openrouterInfo">Verificando...</span></div>
+        <div class="field"><label>API Key (sk-or-...)</label><input type="password" id="openrouterKeyInput" placeholder="Cole a key do OpenRouter..."/></div>
+        <button style="background:#7c3aed;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveOpenRouter()">Salvar Nexia</button>
+      </div>
+
+      <div class="api-card" style="border-color:rgba(0,180,216,.2)">
+        <div class="api-card-header">
+          <div class="api-icon" style="background:rgba(0,180,216,.15)">🔵</div>
+          <div><div class="api-card-title">DeepSeek</div><div class="api-card-sub">Gratuito</div></div>
+        </div>
+        <div class="key-status"><div class="kdot" id="deepseekDot" style="background:#333"></div><span id="deepseekInfo">Verificando...</span></div>
+        <div class="field">
+          <label>Modelo padrão</label>
+          <select id="deepseekModel">
+            <option value="deepseek-chat">DeepSeek Chat</option>
+            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
+          </select>
+        </div>
+        <div class="field"><label>API Key (sk-...)</label><input type="password" id="deepseekKeyInput" placeholder="Cole a key do DeepSeek..."/></div>
+        <button style="background:#00b4d8;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveDeepSeek()">Salvar DeepSeek</button>
+      </div>
+
     </div>
   </div>
 
@@ -340,6 +368,12 @@ async function loadConfig() {
     mDot.style.background = d.hasMistralKey ? '#ff7000' : '#333';
     mDot.style.boxShadow = d.hasMistralKey ? '0 0 6px #ff7000' : 'none';
     document.getElementById('mistralInfo').textContent = d.hasMistralKey ? '✅ '+d.mistralKeyMasked : 'Nenhuma key configurada';
+  const orDot = document.getElementById('openrouterDot');
+  if(orDot){ orDot.style.background = d.hasOpenrouterKey?'#7c3aed':'#333'; orDot.style.boxShadow = d.hasOpenrouterKey?'0 0 6px #7c3aed':'none'; }
+  document.getElementById('openrouterInfo').textContent = d.hasOpenrouterKey ? '✅ '+d.openrouterKeyMasked : 'Nenhuma key configurada';
+  const dsDot = document.getElementById('deepseekDot');
+  if(dsDot){ dsDot.style.background = d.hasDeepseekKey?'#00b4d8':'#333'; dsDot.style.boxShadow = d.hasDeepseekKey?'0 0 6px #00b4d8':'none'; }
+  document.getElementById('deepseekInfo').textContent = d.hasDeepseekKey ? '✅ '+d.deepseekKeyMasked : 'Nenhuma key configurada';
     if (d.mistralModel) document.getElementById('mistralModel').value = d.mistralModel;
   }
 }
