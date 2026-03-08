@@ -272,7 +272,7 @@ const models={
   groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama-3.2-90b-vision-preview','llama-3.2-11b-vision-preview','llama-guard-3-8b'],
   gemini:['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro'],
   mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b'],
-  openrouter:['openrouter/auto','openrouter/free','meta-llama/llama-4-scout:free','meta-llama/llama-4-maverick:free','deepseek/deepseek-r1:free','deepseek/deepseek-chat-v3-0324:free','qwen/qwen3-8b:free','google/gemma-3-27b-it:free'],
+  openrouter:['openrouter/auto','openrouter/free'],
 };
 
 const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed'};
@@ -287,7 +287,8 @@ function setProvider(p){
   });
   const sel=document.getElementById('modelSelect');
   const list=models[p]||[];
-  sel.innerHTML=list.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const modelLabels={'openrouter/auto':'Nexia Auto','openrouter/free':'Nexia Free'};
+  sel.innerHTML=list.map(m=>`<option value="${m}">${modelLabels[m]||m}</option>`).join('');
   model=list[0]||'';
   document.getElementById('sendBtn').style.background=provColors[p]||'var(--accent)';
   localStorage.setItem('provider',p);
