@@ -98,6 +98,7 @@ async function initDB() {
     expires_at BIGINT NOT NULL
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_openrouter_key TEXT`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_mistral_key TEXT`);
   await q(`CREATE TABLE IF NOT EXISTS backup_keys (
     id SERIAL PRIMARY KEY,
     provider TEXT NOT NULL,
@@ -306,7 +307,7 @@ app.post('/api/chat', auth, async (req,res) => {
       if (typeof m.content !== 'string') return { ...m, content: String(m.content || '') };
       return m;
     });
-    const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key,personal_mistral_key FROM users WHERE id=$1', [req.user.id]);
+    const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
     const userData = ur.rows[0];
     let apiKey;
     if (provider==='groq') {
