@@ -514,22 +514,13 @@ async function send(){
     document.getElementById(tid)?.remove();
     if(!r.ok){addMsg('ai','❌ '+d.error,provider);history.pop();}
     else{
-      // Detecta imagem via marcador ##IMG##
-      const imgStart = d.reply.indexOf('##IMG##');
-      const imgEnd = d.reply.indexOf('##ENDIMG##');
-      let imgPrompt = null;
-      let cleanReply = d.reply;
-      if(imgStart !== -1 && imgEnd !== -1){
-        imgPrompt = d.reply.slice(imgStart + 7, imgEnd).trim();
-        cleanReply = d.reply.slice(0, imgStart).trim();
-      }
-
+      // Backend já detectou e retorna imageUrl se for pedido de imagem
       const codeBlocks = extractCodeBlocks(d.reply);
       const hasZip = codeBlocks.length > 0;
 
-      if(imgPrompt){
-        if(cleanReply) addMsg('ai', cleanReply, provider);
-        generateImage(imgPrompt);
+      if(d.imageUrl){
+        if(d.reply) addMsg('ai', d.reply, provider);
+        showGeneratedImage(d.imageUrl);
       } else if(hasZip){
         addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
       } else {
@@ -681,7 +672,7 @@ function showTyping(){
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
 }
 
-async function generateImage(prompt){
+function showGeneratedImage(imgUrl){
   const msgs = document.getElementById('messages');
   const loadDiv = document.createElement('div');
   loadDiv.className = 'msg-row ai';
@@ -689,16 +680,16 @@ async function generateImage(prompt){
   msgs.appendChild(loadDiv);
   msgs.scrollTop = msgs.scrollHeight;
 
-  try {
-    const r = await fetch('/api/generate-image', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt })
-    });
-    const data = await r.json();
+  const img = new Image();
+  const timeout = setTimeout(() => {
     loadDiv.remove();
-    if (!r.ok) { addMsg('ai', '❌ ' + (data.error||'Erro ao gerar imagem.'), provider); return; }
-    const imgUrl = data.url;
+    addMsg('ai', '❌ Tempo esgotado ao gerar imagem. Tente novamente.', provider);
+  }, 35000);
+
+  img.onload = () => {
+    clearTimeout(timeout);
+    loadDiv.remove();
+    const safeUrl = imgUrl.replace(/'/g, '%27');
     const wrap = document.createElement('div');
     wrap.className = 'msg-row ai';
     wrap.innerHTML = `
@@ -706,17 +697,20 @@ async function generateImage(prompt){
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${imgUrl}" class="gen-img" alt="imagem gerada" crossorigin="anonymous">
-            <button class="img-download-btn" onclick="downloadImage('${imgUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
+            <img src="${imgUrl}" class="gen-img" alt="imagem gerada">
+            <button class="img-download-btn" onclick="downloadImage('${safeUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
           </div>
         </div>
       </div>`;
     msgs.appendChild(wrap);
     msgs.scrollTop = msgs.scrollHeight;
-  } catch(e) {
+  };
+  img.onerror = () => {
+    clearTimeout(timeout);
     loadDiv.remove();
-    addMsg('ai', '❌ Erro ao gerar imagem.', provider);
-  }
+    addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
+  };
+  img.src = imgUrl;
 }
 
 async function downloadImage(url, filename){
