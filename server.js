@@ -98,6 +98,14 @@ async function initDB() {
     expires_at BIGINT NOT NULL
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_openrouter_key TEXT`);
+  await q(`CREATE TABLE IF NOT EXISTS backup_keys (
+    id SERIAL PRIMARY KEY,
+    provider TEXT NOT NULL,
+    key_value TEXT NOT NULL,
+    label TEXT,
+    active BOOLEAN DEFAULT true,
+    created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
+  )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen BIGINT DEFAULT 0`);
   console.log('✅ Banco pronto!');
 }
@@ -312,11 +320,26 @@ app.post('/api/chat', auth, async (req,res) => {
     }
     const defaultModels = {groq:'llama-3.3-70b-versatile',gemini:'gemini-2.0-flash',openrouter:'meta-llama/llama-4-scout:free',deepseek:'deepseek-chat',mistral:'mistral-large-latest'};
     const usedModel = model || defaultModels[provider] || 'llama-3.3-70b-versatile';
-    const reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt)
-      : provider==='gemini' ? await callGemini(apiKey, usedModel, messages, systemPrompt)
-      : provider==='openrouter' ? await callOpenRouter(apiKey, usedModel, messages, systemPrompt)
-      : provider==='deepseek' ? await callDeepSeek(apiKey, usedModel, messages, systemPrompt)
-      : await callMistral(apiKey, usedModel, messages, systemPrompt);
+    // Use fallback system only when not using personal key
+    const hasPersonalKey = (provider==='groq' && userData?.personal_groq_key)
+      || (provider==='gemini' && userData?.personal_gemini_key)
+      || (provider==='openrouter' && userData?.personal_openrouter_key)
+      || (provider==='mistral' && userData?.personal_mistral_key);
+
+    let reply;
+    if (hasPersonalKey) {
+      reply = provider==='groq' ? await callGroq(apiKey, usedModel, messages, systemPrompt)
+        : provider==='gemini' ? await callGemini(apiKey, usedModel, messages, systemPrompt)
+        : provider==='openrouter' ? await callOpenRouter(apiKey, usedModel, messages, systemPrompt)
+        : await callMistral(apiKey, usedModel, messages, systemPrompt);
+    } else {
+      const callFn = provider==='groq' ? callGroq
+        : provider==='gemini' ? callGemini
+        : provider==='openrouter' ? callOpenRouter
+        : provider==='deepseek' ? callDeepSeek
+        : callMistral;
+      reply = await tryWithFallback(provider, apiKey, callFn, usedModel, messages, systemPrompt);
+    }
     if (conversationId) {
       const cr = await q('SELECT * FROM conversations WHERE id=$1 AND user_id=$2', [conversationId, req.user.id]);
       if (cr.rows.length) {
@@ -331,6 +354,28 @@ app.post('/api/chat', auth, async (req,res) => {
     res.json({ reply });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
+
+// Try main key first, if fails try backup keys in order
+async function tryWithFallback(provider, mainKey, callFn, model, messages, sys) {
+  const errors = [];
+  // Try main key
+  try {
+    return await callFn(mainKey, model, messages, sys);
+  } catch(e) {
+    errors.push(`Main: ${e.message}`);
+  }
+  // Try backup keys
+  const backups = await q('SELECT key_value,label FROM backup_keys WHERE provider=$1 AND active=true ORDER BY id ASC', [provider]);
+  for (const bk of backups.rows) {
+    try {
+      console.log(`[fallback] Tentando key backup: ${bk.label||bk.key_value.slice(0,8)}`);
+      return await callFn(bk.key_value, model, messages, sys);
+    } catch(e) {
+      errors.push(`Backup ${bk.label||'?'}: ${e.message}`);
+    }
+  }
+  throw new Error(`Todas as keys falharam. Detalhes: ${errors.join(' | ')}`);
+}
 
 async function callGroq(apiKey, model, messages, sys) {
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -551,6 +596,37 @@ app.post('/api/reset-password', async (req,res) => {
     await q('UPDATE users SET password=$1 WHERE id=$2', [require('bcryptjs').hashSync(newPassword,10), rt.user_id]);
     await q('DELETE FROM reset_tokens WHERE token=$1', [token]);
     res.json({ ok:true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Backup keys endpoints
+app.get('/api/admin/backup-keys', auth, role('creator','admin'), async (req,res) => {
+  try {
+    const r = await q('SELECT id,provider,label,active,created_at,LEFT(key_value,8)||'••••' as key_masked FROM backup_keys ORDER BY provider,id');
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/backup-keys', auth, role('creator','admin'), async (req,res) => {
+  try {
+    const { provider, key_value, label } = req.body;
+    if (!provider || !key_value) return res.status(400).json({ error: 'provider e key obrigatórios.' });
+    await q('INSERT INTO backup_keys (provider,key_value,label) VALUES ($1,$2,$3)', [provider, key_value, label||null]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/backup-keys/:id', auth, role('creator','admin'), async (req,res) => {
+  try {
+    await q('DELETE FROM backup_keys WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/admin/backup-keys/:id', auth, role('creator','admin'), async (req,res) => {
+  try {
+    await q('UPDATE backup_keys SET active=$1 WHERE id=$2', [req.body.active, req.params.id]);
+    res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
