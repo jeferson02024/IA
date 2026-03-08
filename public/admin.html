@@ -117,14 +117,16 @@ input::placeholder{color:var(--muted)}
 .btn-cancel{background:none;border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer}
 .btn-primary{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 @media(max-width:800px){
-  .sidenav{width:56px;padding:12px 8px}
-  .nav-item span:not(.nav-icon){display:none}
-  .nav-label{display:none}
-  .nav-chat .nc-text{display:none}
+  .sidenav{display:none}
+  .main{padding:12px;padding-bottom:80px}
   .stats-grid{grid-template-columns:1fr 1fr}
   .api-grid,.two-col{grid-template-columns:1fr}
-  .main{padding:16px}
+  .bottom-nav{display:flex!important}
 }
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--sidebar);border-top:1px solid var(--border);z-index:100;padding:6px 4px;gap:2px;overflow-x:auto}
+.bn-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:10px;white-space:nowrap;flex-shrink:0;transition:all .15s;min-width:50px}
+.bn-item.active{color:var(--accent);background:rgba(255,255,255,.05)}
+.bn-item .bn-icon{font-size:18px}
 </style>
 </head>
 <body>
@@ -466,6 +468,10 @@ async function init() {
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
+    ['bnApikeys','bnBackup','bnTheme','bnDatabase'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.style.display='flex';
+    });
     ['navLabelConfig','navApikeys','navBackup','navTheme','navDatabase'].forEach(id=>{
       document.getElementById(id).style.display='';
     });
@@ -717,5 +723,13 @@ async function doLogout(){await fetch('/api/logout',{method:'POST'});window.loca
 
 init();
 </script>
+<div class="bottom-nav" id="bottomNav">
+  <div class="bn-item active" onclick="showTab('dashboard')" id="bnDashboard"><span class="bn-icon">📊</span>Início</div>
+  <div class="bn-item" onclick="showTab('users')" id="bnUsers"><span class="bn-icon">👥</span>Usuários</div>
+  <div class="bn-item" onclick="showTab('apikeys')" id="bnApikeys" style="display:none"><span class="bn-icon">🔑</span>API Keys</div>
+  <div class="bn-item" onclick="showTab('backup')" id="bnBackup" style="display:none"><span class="bn-icon">🔄</span>Backup</div>
+  <div class="bn-item" onclick="showTab('theme')" id="bnTheme" style="display:none"><span class="bn-icon">🎨</span>Tema</div>
+  <div class="bn-item" onclick="showTab('database')" id="bnDatabase" style="display:none"><span class="bn-icon">🗄️</span>Database</div>
+</div>
 </body>
 </html>
