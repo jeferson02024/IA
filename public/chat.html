@@ -675,29 +675,25 @@ async function generateImage(prompt){
   msgs.appendChild(loadDiv);
   msgs.scrollTop = msgs.scrollHeight;
 
-  const encodedPrompt = encodeURIComponent(prompt);
-  const seed = Math.floor(Math.random()*99999);
-  const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${seed}`;
-
   try {
-    await new Promise((resolve, reject) => {
-      const img = new Image();
-      const timeout = setTimeout(() => reject(new Error('timeout')), 30000);
-      img.onload = () => { clearTimeout(timeout); resolve(); };
-      img.onerror = () => { clearTimeout(timeout); reject(new Error('error')); };
-      img.src = imgUrl;
+    const r = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt })
     });
+    const data = await r.json();
     loadDiv.remove();
+    if (!r.ok) { addMsg('ai', '❌ ' + (data.error||'Erro ao gerar imagem.'), provider); return; }
+    const imgUrl = data.url;
     const wrap = document.createElement('div');
     wrap.className = 'msg-row ai';
-    const safeUrl = imgUrl.replace(/'/g, '%27');
     wrap.innerHTML = `
       <div class="msg-inner">
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${imgUrl}" class="gen-img" alt="imagem gerada">
-            <button class="img-download-btn" onclick="downloadImage('${safeUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
+            <img src="${imgUrl}" class="gen-img" alt="imagem gerada" crossorigin="anonymous">
+            <button class="img-download-btn" onclick="downloadImage('${imgUrl}','nexia-image.png')">⬇️ Baixar imagem</button>
           </div>
         </div>
       </div>`;
@@ -705,7 +701,7 @@ async function generateImage(prompt){
     msgs.scrollTop = msgs.scrollHeight;
   } catch(e) {
     loadDiv.remove();
-    addMsg('ai', '❌ Não consegui gerar a imagem. Tente novamente.', provider);
+    addMsg('ai', '❌ Erro ao gerar imagem.', provider);
   }
 }
 

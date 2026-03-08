@@ -247,6 +247,16 @@ input::placeholder{color:var(--muted)}
         <button style="background:#7c3aed;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%" onclick="saveOpenRouter()">Salvar Nexia</button>
       </div>
 
+      <div class="api-card" style="border-color:rgba(255,200,0,.2)">
+        <div class="api-card-header">
+          <div class="api-icon" style="background:rgba(255,200,0,.15)">🎨</div>
+          <div><div class="api-card-title">Together AI</div><div class="api-card-sub">Geração de imagens · Gratuito</div></div>
+        </div>
+        <div class="key-status"><div class="kdot" id="togetherDot" style="background:#333"></div><span id="togetherInfo">Verificando...</span></div>
+        <div class="field"><label>API Key (key_...)</label><input type="password" id="togetherKeyInput" placeholder="Cole a key do Together AI..."/></div>
+        <button style="background:#f5a623;border:none;border-radius:8px;padding:9px 16px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;width:100%" onclick="saveTogether()">Salvar Together</button>
+      </div>
+
 
     </div>
   </div>
@@ -362,6 +372,9 @@ async function loadConfig() {
   const orDot = document.getElementById('openrouterDot');
   if(orDot){ orDot.style.background = d.hasOpenrouterKey?'#7c3aed':'#333'; orDot.style.boxShadow = d.hasOpenrouterKey?'0 0 6px #7c3aed':'none'; }
   document.getElementById('openrouterInfo').textContent = d.hasOpenrouterKey ? '✅ '+d.openrouterKeyMasked : 'Nenhuma key configurada';
+  const tDot = document.getElementById('togetherDot');
+  if(tDot){ tDot.style.background = d.hasTogetherKey?'#f5a623':'#333'; tDot.style.boxShadow = d.hasTogetherKey?'0 0 6px #f5a623':'none'; }
+  if(document.getElementById('togetherInfo')) document.getElementById('togetherInfo').textContent = d.hasTogetherKey ? '✅ '+d.togetherKeyMasked : 'Nenhuma key configurada';
   const dsDot = document.getElementById('deepseekDot');
   if(dsDot){ dsDot.style.background = d.hasDeepseekKey?'#00b4d8':'#333'; dsDot.style.boxShadow = d.hasDeepseekKey?'0 0 6px #00b4d8':'none'; }
   document.getElementById('deepseekInfo').textContent = d.hasDeepseekKey ? '✅ '+d.deepseekKeyMasked : 'Nenhuma key configurada';
@@ -397,6 +410,15 @@ async function saveGemini() {
   if (!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('geminiKeyInput').value='';
   toast('✅ Key do Gemini salva!','ok'); loadConfig();
+}
+
+async function saveTogether() {
+  const togetherKey = document.getElementById('togetherKeyInput').value.trim();
+  if (!togetherKey) return toast('Cole a API key do Together.','err');
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({togetherKey})});
+  if (!r.ok) return toast('Erro ao salvar.','err');
+  document.getElementById('togetherKeyInput').value='';
+  toast('✅ Key Together salva!','ok'); loadConfig();
 }
 
 async function saveOpenRouter() {
