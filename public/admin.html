@@ -356,6 +356,17 @@ input::placeholder{color:var(--muted)}
           <div class="field"><label>API Key (sk-or-...)</label><input type="password" id="openrouterKeyInput" placeholder="Cole a key do OpenRouter..."/></div>
           <button class="btn-save" style="background:#7c3aed;color:#fff" onclick="saveOpenRouter()">Salvar Nexia</button>
         </div>
+
+        <div class="api-card" style="border-color:rgba(249,115,22,.3)">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(249,115,22,.15);font-size:20px">🎨</div>
+            <div><div class="api-card-title">Cloudflare AI</div><div class="api-card-sub">Geração de imagens · Grátis</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="cfDot" style="background:#333"></div><span id="cfInfo">Verificando...</span></div>
+          <div class="field"><label>Account ID</label><input type="text" id="cfAccountInput" placeholder="c7dc19a209cbcf..."/></div>
+          <div class="field"><label>API Token</label><input type="password" id="cfTokenInput" placeholder="Cole o token do Cloudflare..."/></div>
+          <button class="btn-save" style="background:#f97316;color:#fff" onclick="saveCF()">Salvar Cloudflare</button>
+        </div>
       </div>
     </div>
 
@@ -664,6 +675,17 @@ async function saveMistral(){
   document.getElementById('mistralKeyInput').value='';
   toast('✅ Key do Mistral salva!','ok');loadConfig();
 }
+async function saveCF(){
+  const cfAccountId = document.getElementById('cfAccountInput').value.trim();
+  const cfApiToken = document.getElementById('cfTokenInput').value.trim();
+  if(!cfAccountId||!cfApiToken) return toast('Preencha Account ID e Token.','err');
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cfAccountId,cfApiToken})});
+  if(!r.ok) return toast('Erro ao salvar.','err');
+  document.getElementById('cfAccountInput').value='';
+  document.getElementById('cfTokenInput').value='';
+  toast('✅ Cloudflare AI configurado!','ok'); loadConfig();
+}
+
 async function saveOpenRouter(){
   const openrouterKey=document.getElementById('openrouterKeyInput').value.trim();
   const openrouterModel=document.getElementById('openrouterModel').value;
