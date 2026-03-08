@@ -274,21 +274,27 @@ let pendingFile=null; // {type:'image'|'text', ...}
 const models={
   groq:['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama-3.2-90b-vision-preview','llama-3.2-11b-vision-preview','llama-guard-3-8b'],
   gemini:['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro'],
-  mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b']
+  mistral:['mistral-large-latest','mistral-small-latest','codestral-latest','open-mistral-7b'],
+  openrouter:['meta-llama/llama-4-scout:free','meta-llama/llama-4-maverick:free','deepseek/deepseek-r1:free','google/gemini-2.0-flash-exp:free','mistralai/mistral-7b-instruct:free','qwen/qwen2.5-72b-instruct:free'],
+  deepseek:['deepseek-chat','deepseek-reasoner']
 };
 
 const provColors={groq:'var(--accent)',gemini:'var(--blue)',mistral:'#ff7000',openrouter:'#7c3aed',deepseek:'#00b4d8'};
 
 function setProvider(p){
   provider=p;
-  ['groq','gemini','mistral'].forEach(x=>{
-    document.getElementById('btn'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('active',x===p);
+  // update active state for all provider buttons
+  const btnMap={groq:'btnGroq',gemini:'btnGemini',mistral:'btnMistral',openrouter:'btnOpenrouter',deepseek:'btnDeepseek'};
+  Object.entries(btnMap).forEach(([key,id])=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('active', key===p);
   });
   const sel=document.getElementById('modelSelect');
-  sel.innerHTML=models[p].map(m=>`<option value="${m}">${m}</option>`).join('');
-  model=models[p][0];
-  document.getElementById('sendBtn').style.background=provColors[p];
-  // ZIP/image hint
+  const list=models[p]||[];
+  sel.innerHTML=list.map(m=>`<option value="${m}">${m}</option>`).join('');
+  model=list[0]||'';
+  document.getElementById('sendBtn').style.background=provColors[p]||'var(--accent)';
+  localStorage.setItem('provider',p);
   const hint=document.querySelector('.input-hint');
   hint.textContent='Enter para enviar · Shift+Enter para nova linha';
 }
