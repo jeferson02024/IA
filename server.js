@@ -546,20 +546,14 @@ app.post('/api/generate-image', auth, async (req,res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt obrigatório.' });
-    const ck = await q('SELECT value FROM config WHERE key=$1', ['global_together_key']);
-    const apiKey = ck.rows[0]?.value || process.env.TOGETHER_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: 'Nenhuma API key do Together configurada.' });
-    const r = await fetch('https://api.together.xyz/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'black-forest-labs/FLUX.1-schnell-Free', prompt, n: 1, width: 512, height: 512 })
-    });
-    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error?.message||`Together erro ${r.status}`); }
-    const data = await r.json();
-    const imgUrl = data.data?.[0]?.url;
-    if (!imgUrl) throw new Error('Imagem não gerada.');
+    const seed = Math.floor(Math.random() * 999999);
+    const encoded = encodeURIComponent(prompt);
+    const imgUrl = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${seed}`;
+    // Verifica se a imagem carrega
+    const r = await fetch(imgUrl, { signal: AbortSignal.timeout(25000) });
+    if (!r.ok) throw new Error('Erro ao gerar imagem.');
     res.json({ url: imgUrl });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { res.status(500).json({ error: 'Não consegui gerar a imagem. Tente novamente.' }); }
 });
 
 app.get('/auth/google', passport.authenticate('google', { scope:['profile','email'] }));
