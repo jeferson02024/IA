@@ -508,7 +508,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\\n1. IMAGEM/FOTO/DESENHO/ILUSTRAÇÃO: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG## — nunca repita a descrição em português, nunca coloque a tag em linha separada.\\n2. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\\nNUNCA exiba a tag ##IMG## como texto visível ao usuário.'}))
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\\n1. IMAGEM/FOTO/DESENHO/ILUSTRAÇÃO: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG## — nunca repita a descrição em português, nunca coloque a tag em linha separada.\\n2. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\\nNUNCA exiba a tag ##IMG## como texto visível ao usuário.'})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
