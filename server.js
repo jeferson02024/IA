@@ -292,8 +292,19 @@ app.delete('/api/conversations/:id', auth, async (req,res) => {
 
 app.post('/api/chat', auth, async (req,res) => {
   try {
-    const {messages, systemPrompt, provider, model, conversationId} = req.body;
+    const {messages: rawMessages, systemPrompt, provider, model, conversationId} = req.body;
     if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
+
+    // Sanitize messages: convert array content (image+text) to string only
+    const messages = (rawMessages||[]).map(m => {
+      if (Array.isArray(m.content)) {
+        // Extract text parts only for providers that don't support vision in history
+        const textParts = m.content.filter(p => p.type === 'text').map(p => p.text).join(' ');
+        return { ...m, content: textParts || '[imagem]' };
+      }
+      if (typeof m.content !== 'string') return { ...m, content: String(m.content || '') };
+      return m;
+    });
     const ur = await q('SELECT personal_groq_key,personal_gemini_key,personal_openrouter_key,personal_deepseek_key FROM users WHERE id=$1', [req.user.id]);
     const userData = ur.rows[0];
     let apiKey;
