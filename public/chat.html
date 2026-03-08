@@ -802,13 +802,34 @@ function showGeneratedImage(imgUrl, attempt=1){
 }
 
 function baixarImagem(url){
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'nexia-imagem-' + Date.now() + '.png';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => document.body.removeChild(a), 1000);
+  const filename = 'nexia-imagem-' + Date.now() + '.png';
+  if(url.startsWith('data:')){
+    try {
+      const arr = url.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      const u8arr = new Uint8Array(bstr.length);
+      for(let i=0;i<bstr.length;i++) u8arr[i] = bstr.charCodeAt(i);
+      const blob = new Blob([u8arr], {type: mime});
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = filename; a.style.display='none';
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 2000);
+      // Fallback para APK/WebView: abre nova aba com botão de salvar
+      setTimeout(()=>{
+        const w = window.open('','_blank');
+        if(w) w.document.write(`<html><body style="margin:0;background:#000;text-align:center"><p style="color:#fff;font-family:sans-serif">Pressione e segure na imagem para salvar</p><img src="${url}" style="max-width:100vw"/></body></html>`);
+      }, 800);
+    } catch(e) {
+      window.open(url, '_blank');
+    }
+  } else {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=> document.body.removeChild(a), 1000);
+  }
 }
 
 async function downloadImage(url, filename){
