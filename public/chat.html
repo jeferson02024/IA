@@ -531,7 +531,7 @@ async function send(){
 
       // Also detect image request from user message
       const lastMsg = (history[history.length-1]?.content||'').toLowerCase();
-      const wantsImage = /imagem|foto|desenho|ilustra|crie.*foto|gere.*foto|gera.*imagem|cria.*imagem/i.test(lastMsg);
+      const wantsImage = /crie uma (imagem|foto|desenho|ilustra)|gere uma (imagem|foto)|gera uma (imagem|foto)|gerar imagem|criar imagem|cria uma (imagem|foto)|faça uma (imagem|foto)|faz uma (imagem|foto)|desenhe|ilustre/i.test(lastMsg);
 
       if(d.imageUrl){
         if(cleanReply) addMsg('ai', cleanReply, provider);
