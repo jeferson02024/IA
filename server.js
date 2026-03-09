@@ -403,10 +403,10 @@ app.post('/api/chat', auth, async (req,res) => {
       }
     }
 
-    // Se não achou tag mas usuário pediu imagem, detecta pela mensagem
+    // Só gera imagem se usuário usou verbo de ação explícito
     const lastUserMsg = (messages[messages.length-1]?.content||'').toLowerCase();
-    const imgKeywords = ['imagem','foto','desenho','ilustração','crie uma foto','gere uma foto','gerar imagem','criar imagem','gea imagem','cria imagem','gera imagem','uma foto','uma imagem','um desenho'];
-    const askedForImage = imgKeywords.some(k => lastUserMsg.includes(k));
+    const imgActionPhrases = ['crie uma imagem','crie uma foto','crie um desenho','crie uma ilustração','gere uma imagem','gere uma foto','gera uma imagem','gera uma foto','gerar imagem','criar imagem','cria uma imagem','cria uma foto','faça uma imagem','faça uma foto','faz uma imagem','faz uma foto','desenhe','ilustre','cria imagem','gera imagem'];
+    const askedForImage = imgActionPhrases.some(k => lastUserMsg.includes(k));
     if (!imagePrompt && askedForImage) {
       // Usa a mensagem do usuário como prompt - não mostra texto descritivo
       imagePrompt = lastUserMsg;
