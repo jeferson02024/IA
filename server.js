@@ -40,10 +40,28 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false
+  ssl: false,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
-const q = (sql, p=[]) => pool.query(sql, p);
+pool.on('error', (err) => {
+  console.error('Pool error (auto-recovering):', err.message);
+});
+
+const q = async (sql, p=[]) => {
+  try {
+    return await pool.query(sql, p);
+  } catch(err) {
+    if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED' || err.message.includes('Connection terminated')) {
+      console.log('[db] reconectando...');
+      await new Promise(r => setTimeout(r, 1000));
+      return await pool.query(sql, p);
+    }
+    throw err;
+  }
+};
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
