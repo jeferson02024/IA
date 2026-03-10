@@ -196,27 +196,30 @@
 </div>
 
 <script>
-  // Detecta se NÃO está no Chrome real (detecta WebView, Instagram, WhatsApp, Safari, Firefox, etc.)
-  function isNotRealChrome() {
+  // Detecta se está dentro do nosso app Android (WebView)
+  function isInOurApp() {
     const ua = navigator.userAgent || '';
-    const isChrome = /Chrome\//.test(ua) && /Google Inc/.test(navigator.vendor || '');
-    const isWebView = /wv/.test(ua) || window.Android !== undefined;
-    const isInAppBrowser = /Instagram|FBAN|FBAV|Twitter|Line|WhatsApp|Snapchat|TikTok/.test(ua);
-    return !isChrome || isWebView || isInAppBrowser;
+    return /wv/.test(ua) || window.Android !== undefined;
   }
 
-  // Se não estiver no Chrome, redireciona TODA a página para abrir no Chrome
+  // Detecta in-app browsers de outros apps (Instagram, WhatsApp, etc.)
+  function isInAppBrowser() {
+    const ua = navigator.userAgent || '';
+    return /Instagram|FBAN|FBAV|Twitter|Line|WhatsApp|Snapchat|TikTok/.test(ua);
+  }
+
+  // Se veio de outro app (Instagram, WhatsApp...), redireciona pro Chrome
   (function() {
-    if (isNotRealChrome()) {
-      const currentUrl = window.location.href;
-      // Intent Android: abre no Chrome
-      const chromeIntent = 'intent://' + currentUrl.replace(/https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
-      window.location.replace(chromeIntent);
+    if (isInAppBrowser()) {
+      const url = window.location.href;
+      window.location.replace('intent://' + url.replace(/https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end');
     }
   })();
 
   function googleLogin(e) {
     e.preventDefault();
+    // Se estiver no nosso app → o Android vai interceptar e abrir no Chrome via Custom Tabs
+    // Se estiver no navegador → vai direto
     window.location.href = '/auth/google';
   }
 
