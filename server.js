@@ -799,6 +799,12 @@ app.get('/auth/google/callback',
   }
 );
 
+// Necessário para Deep Link Android funcionar
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
+});
+
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 app.listen(PORT, async () => {
   console.log(`🚀 Nexia rodando na porta ${PORT}`);
