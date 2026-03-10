@@ -518,7 +518,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\\n1. IMAGEM/FOTO/DESENHO/ILUSTRAÇÃO: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG## — nunca repita a descrição em português, nunca coloque a tag em linha separada.\\n2. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\\nNUNCA exiba a tag ##IMG## como texto visível ao usuário.'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\n1. SÓ use a tag ##IMG## se o usuário EXPLICITAMENTE pedir para CRIAR, GERAR ou DESENHAR uma imagem/foto/ilustração. Exemplo: "crie uma imagem de...", "gere uma foto de...", "desenhe...". Para qualquer outra mensagem, NUNCA use a tag ##IMG##.\n2. Quando gerar imagem: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG##.\n3. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\n4. NUNCA exiba a tag ##IMG## como texto visível ao usuário.\n5. Para saudações, perguntas e conversas normais, responda normalmente SEM nenhuma tag de imagem.'})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
@@ -553,11 +553,6 @@ async function send(){
         // IA retornou tag ##IMG## mas backend não detectou - frontend gera
         if(cleanReply) addMsg('ai', cleanReply, provider);
         generateImageFrontend(imgTagMatch[1].trim());
-      } else if(wantsImage && !hasZip){
-        if(cleanReply) addMsg('ai', cleanReply, provider);
-        const tagMatch = (d.reply||'').match(/\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i);
-        const imgPrompt = tagMatch ? tagMatch[1].trim() : lastMsg;
-        generateImageFrontend(imgPrompt);
       } else if(hasZip){
         addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
       } else {
