@@ -387,7 +387,7 @@ app.post('/api/chat', auth, async (req,res) => {
     let imagePrompt = null;
     let cleanReply = reply;
 
-    // Suporta varios formatos que a IA pode usar
+    // Só gera imagem se a IA retornou a tag ##IMG## explicitamente
     const patterns = [
       /##IMG##([\s\S]+?)##ENDIMG##/i,
       /\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i,
@@ -401,16 +401,6 @@ app.post('/api/chat', auth, async (req,res) => {
         cleanReply = reply.replace(pat, '').trim();
         break;
       }
-    }
-
-    // Só gera imagem se usuário usou verbo de ação explícito
-    const lastUserMsg = (messages[messages.length-1]?.content||'').toLowerCase();
-    const imgActionPhrases = ['crie uma imagem','crie uma foto','crie um desenho','crie uma ilustração','gere uma imagem','gere uma foto','gera uma imagem','gera uma foto','gerar imagem','criar imagem','cria uma imagem','cria uma foto','faça uma imagem','faça uma foto','faz uma imagem','faz uma foto','desenhe','ilustre','cria imagem','gera imagem'];
-    const askedForImage = imgActionPhrases.some(k => lastUserMsg.includes(k));
-    if (!imagePrompt && askedForImage) {
-      // Usa a mensagem do usuário como prompt - não mostra texto descritivo
-      imagePrompt = lastUserMsg;
-      cleanReply = '';
     }
 
     if (imagePrompt) {
