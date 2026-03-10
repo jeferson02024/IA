@@ -522,6 +522,18 @@ input::placeholder{color:var(--muted)}
 <div class="toast" id="toast"></div>
 
 <script>
+  // Redireciona para Chrome se acessado fora dele
+  (function(){
+    const ua = navigator.userAgent||'';
+    const isChrome = /Chrome\//.test(ua) && /Google Inc/.test(navigator.vendor||'');
+    const isWebView = /wv/.test(ua) || window.Android!==undefined;
+    const isInApp = /Instagram|FBAN|FBAV|Twitter|Line|WhatsApp|Snapchat|TikTok/.test(ua);
+    if(!isChrome||isWebView||isInApp){
+      const url = window.location.href;
+      window.location.replace('intent://'+url.replace(/https?:\/\//,'')+' #Intent;scheme=https;package=com.android.chrome;end');
+    }
+  })();
+
 let me = null, statsData = null;
 
 function openDrawer(){
