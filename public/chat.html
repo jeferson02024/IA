@@ -227,8 +227,28 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 <div class="overlay" id="settingsOverlay" onclick="closeOut(event,'settingsOverlay')">
   <div class="modal">
     <h3>⚙️ Configurações</h3>
-    <p>Suas keys pessoais têm prioridade sobre as keys globais.</p>
-    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Keys Pessoais</div>
+
+    <!-- PERFIL -->
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px">👤 Perfil no Chat</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <div style="position:relative;flex-shrink:0">
+        <img id="profileAvatarPreview" src="/logo.png" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+        <label for="profilePhotoInput" style="position:absolute;bottom:0;right:0;background:#7c3aed;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px">✏️</label>
+        <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="previewProfilePhoto(this)">
+      </div>
+      <div style="flex:1">
+        <div class="modal-field" style="margin-bottom:6px">
+          <label>Seu nome no chat</label>
+          <input type="text" id="profileNameInput" placeholder="Ex: João, Ana, Dev..." maxlength="30"/>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">Aparece no chat compartilhado no lugar do email.</div>
+      </div>
+    </div>
+    <button onclick="saveProfile()" style="width:100%;background:#7c3aed;border:none;border-radius:8px;padding:9px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:16px">💾 Salvar Perfil</button>
+
+    <div class="modal-sep"></div>
+    <p style="margin-bottom:10px">Suas keys pessoais têm prioridade sobre as keys globais.</p>
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🔑 Keys Pessoais</div>
 
     <div class="key-row"><div class="kdot groq" id="groqDot"></div><span id="groqStatus" style="font-size:12px;color:var(--muted)">Groq: verificando...</span></div>
     <div class="modal-field"><label>API Key do Groq (gsk_...)</label><input type="password" id="groqKeyInput" placeholder="Cole sua key do Groq..."/></div>
@@ -1062,7 +1082,44 @@ function shareWhatsApp(){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-// ===== SHARED CHAT ROOM =====
+// ===== PROFILE =====
+function loadProfile(){
+  const name = localStorage.getItem('profileName') || '';
+  const photo = localStorage.getItem('profilePhoto') || '';
+  if(name) document.getElementById('profileNameInput').value = name;
+  if(photo) document.getElementById('profileAvatarPreview').src = photo;
+}
+
+function previewProfilePhoto(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ toast('Foto muito grande! Máx 2MB.','err'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('profileAvatarPreview').src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveProfile(){
+  const name = document.getElementById('profileNameInput').value.trim();
+  const photoSrc = document.getElementById('profileAvatarPreview').src;
+  if(name) localStorage.setItem('profileName', name);
+  else localStorage.removeItem('profileName');
+  // Only save if it's a base64 (uploaded photo), not the default /logo.png
+  if(photoSrc && photoSrc.startsWith('data:')){ 
+    localStorage.setItem('profilePhoto', photoSrc);
+  }
+  toast('✅ Perfil salvo!','ok');
+}
+
+function getMyDisplayName(){
+  return localStorage.getItem('profileName') || (me?.email?.split('@')[0]) || 'Você';
+}
+
+function getMyAvatar(){
+  return localStorage.getItem('profilePhoto') || null;
+}
 let scRoomId = null, scPollInterval = null, scLastTs = 0, scAllMessages = [], scSeenIds = new Set();
 let scProvider = 'groq', scModel = 'llama-3.3-70b-versatile';
 
@@ -1204,6 +1261,26 @@ function appendScMessage(m, noScroll){
   const isMe = m.email === me?.email;
   const isAI = m.role === 'assistant';
 
+  // Get display name and avatar
+  let displayName, avatarHtml;
+  if(isAI){
+    displayName = 'Nexia';
+    avatarHtml = `<img src="/logo.png" style="width:24px;height:24px;border-radius:6px;object-fit:cover;flex-shrink:0">`;
+  } else if(isMe){
+    const myName = getMyDisplayName();
+    const myPhoto = getMyAvatar();
+    displayName = myName;
+    avatarHtml = myPhoto
+      ? `<img src="${myPhoto}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      : `<span style="width:24px;height:24px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${myName.charAt(0).toUpperCase()}</span>`;
+  } else {
+    const n = m.displayName || m.email.split('@')[0];
+    displayName = n;
+    avatarHtml = m.photo
+      ? `<img src="${m.photo}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      : `<span style="width:24px;height:24px;border-radius:50%;background:#2d2d4a;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#a78bfa;flex-shrink:0">${n.charAt(0).toUpperCase()}</span>`;
+  }
+
   let content = escHtml(m.content||'');
   content = content.replace(/##IMG## (.*?) ##ENDIMG##/g, (_,desc)=>
     `<img src="https://image.pollinations.ai/prompt/${encodeURIComponent(desc)}?width=400&height=400&nologo=true" style="max-width:100%;border-radius:10px;margin-top:8px;display:block" loading="lazy">`
@@ -1212,14 +1289,14 @@ function appendScMessage(m, noScroll){
   content = content.replace(/\n/g,'<br>');
 
   const wrap = document.createElement('div');
-  wrap.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:3px;margin-bottom:2px`;
-
-  const labelText = isAI ? `<img src="/logo.png" style="width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px">Nexia`
-    : isMe ? '👤 Você' : `🧑 ${m.email.split('@')[0]}`;
+  wrap.style.cssText = `display:flex;gap:8px;align-items:flex-end;margin-bottom:6px;flex-direction:${isMe?'row-reverse':'row'}`;
 
   wrap.innerHTML = `
-    <span style="font-size:10px;color:var(--muted);padding:0 4px">${labelText}</span>
-    <div style="background:${isAI?'var(--surface)':isMe?'#7c3aed':'#2d2d4a'};border-radius:${isMe?'14px 14px 4px 14px':'14px 14px 14px 4px'};padding:10px 14px;max-width:78%;font-size:14px;color:var(--text);line-height:1.55;word-break:break-word">${content}</div>`;
+    ${avatarHtml}
+    <div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:3px;max-width:78%">
+      <span style="font-size:10px;color:var(--muted);padding:0 4px">${displayName}</span>
+      <div style="background:${isAI?'var(--surface)':isMe?'#7c3aed':'#2d2d4a'};border-radius:${isMe?'14px 14px 4px 14px':'14px 14px 14px 4px'};padding:10px 14px;font-size:14px;color:var(--text);line-height:1.55;word-break:break-word">${content}</div>
+    </div>`;
 
   box.appendChild(wrap);
   if(!noScroll) box.scrollTop = box.scrollHeight;
@@ -1232,7 +1309,11 @@ async function sendSharedMsg(){
   input.value = ''; input.style.height = 'auto';
   document.getElementById('scTyping').style.display = 'block';
   try{
-    const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, provider: scProvider, model: scModel})});
+    const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      text, provider: scProvider, model: scModel,
+      displayName: getMyDisplayName(),
+      photo: getMyAvatar()
+    })});
     const d = await r.json();
     if(!r.ok){ toast(d.error||'Erro.','err'); document.getElementById('scTyping').style.display='none'; return; }
     // Add user msg immediately via dedup-safe method
@@ -1272,6 +1353,7 @@ async function leaveSharedRoom(){
 }
 
 loadAppSettings();
+loadProfile();
 </script>
 </body>
 </html>
