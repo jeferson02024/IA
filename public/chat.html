@@ -130,7 +130,22 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .input-box:focus-within{border-color:#4a4a4a}
 .attach-btn{width:32px;height:32px;border-radius:8px;background:none;border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);font-size:16px;transition:all .15s}
 .attach-btn:hover{background:var(--surface);color:var(--text)}
-/* ===== PLUS MENU ===== */
+/* ===== SUPPORT BUTTON ===== */
+.support-fab{position:fixed;bottom:88px;right:18px;z-index:190;display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.support-btn{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#25d366,#128c7e);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 16px rgba(37,211,102,.4);transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s}
+.support-btn:hover{transform:scale(1.1);box-shadow:0 6px 24px rgba(37,211,102,.5)}
+.support-btn.open{transform:rotate(360deg) scale(1.05)}
+.support-options{display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}
+.support-opt{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.5);white-space:nowrap;
+  opacity:0;transform:translateX(20px) scale(.9);
+  transition:opacity .2s,transform .2s,background .15s;
+  pointer-events:none}
+.support-opt:hover{background:var(--surface)}
+.support-opt .sopt-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.support-options.open .support-opt{opacity:1;transform:translateX(0) scale(1);pointer-events:all}
+.support-options.open .support-opt:nth-child(1){transition-delay:.05s}
+.support-options.open .support-opt:nth-child(2){transition-delay:.1s}
+.support-backdrop2{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:189;backdrop-filter:blur(2px)}
 .plus-menu-wrap{position:relative;flex-shrink:0}
 .plus-btn{width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .2s;flex-shrink:0}
 .plus-btn:hover,.plus-btn.open{background:var(--accent);border-color:var(--accent);color:#000}
@@ -300,6 +315,20 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 </div>
 
 <div class="plus-backdrop" id="plusBackdrop" onclick="closePlusMenu()"></div>
+<div class="support-backdrop2" id="supportBackdrop" onclick="closeSupportMenu()"></div>
+<div class="support-fab" id="supportFab" style="display:none">
+  <div class="support-options" id="supportOptions">
+    <button class="support-opt" id="supportOptChat" onclick="openSupportChat()">
+      <div class="sopt-icon" style="background:rgba(124,58,237,.15)">🤖</div>
+      <span>Chat Nexia</span>
+    </button>
+    <button class="support-opt" id="supportOptWa" onclick="openSupportWa()">
+      <div class="sopt-icon" style="background:rgba(37,211,102,.15)">💬</div>
+      <span>WhatsApp</span>
+    </button>
+  </div>
+  <button class="support-btn" id="supportMainBtn" onclick="toggleSupportMenu()">💬</button>
+</div>
 <!-- Settings Modal -->
 <div class="overlay" id="settingsOverlay" onclick="closeOut(event,'settingsOverlay')">
   <div class="modal">
@@ -1370,6 +1399,57 @@ function shareWhatsApp(){
   const msg = `✨ Olá! Venha conhecer a *${name}* comigo!\nA melhor IA disponível, grátis e em português 🤖\n\n👉 ${url}`;
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
+
+// ===== SUPPORT BUTTON =====
+let supportOpen = false, supportConfig = {};
+
+async function initSupportBtn(){
+  try{
+    const r = await fetch('/api/app-config');
+    const d = await r.json();
+    supportConfig = { phone: d.supportPhone||'', msg: d.supportMsg||'Olá! Preciso de ajuda com o Nexia.', chatUrl: d.supportChatUrl||'/chat.html' };
+    if(supportConfig.phone || supportConfig.chatUrl){
+      document.getElementById('supportFab').style.display = 'flex';
+      // Hide whatsapp option if no phone
+      if(!supportConfig.phone) document.getElementById('supportOptWa').style.display = 'none';
+      // Hide chat option if no chatUrl
+      if(!supportConfig.chatUrl) document.getElementById('supportOptChat').style.display = 'none';
+    }
+  }catch(e){}
+}
+
+function toggleSupportMenu(){
+  supportOpen = !supportOpen;
+  document.getElementById('supportOptions').classList.toggle('open', supportOpen);
+  document.getElementById('supportBackdrop').style.display = supportOpen ? 'block' : 'none';
+  document.getElementById('supportMainBtn').classList.toggle('open', supportOpen);
+  document.getElementById('supportMainBtn').textContent = supportOpen ? '✕' : '💬';
+  if(navigator.vibrate) navigator.vibrate(20);
+}
+
+function closeSupportMenu(){
+  supportOpen = false;
+  document.getElementById('supportOptions').classList.remove('open');
+  document.getElementById('supportBackdrop').style.display = 'none';
+  document.getElementById('supportMainBtn').classList.remove('open');
+  document.getElementById('supportMainBtn').textContent = '💬';
+}
+
+function openSupportWa(){
+  closeSupportMenu();
+  const text = encodeURIComponent(supportConfig.msg);
+  window.open(`https://wa.me/${supportConfig.phone}?text=${text}`, '_blank');
+}
+
+function openSupportChat(){
+  closeSupportMenu();
+  const url = supportConfig.chatUrl || '/chat.html';
+  if(url.startsWith('http')) window.open(url,'_blank');
+  else window.location.href = url;
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', initSupportBtn);
 
 // ===== PLUS MENU =====
 let plusOpen = false;

@@ -692,6 +692,24 @@ input::placeholder{color:var(--muted)}
           <span id="registrationStatus" style="font-size:12px;color:var(--muted)">Verificando...</span>
         </div>
       </div>
+
+      <div class="section">
+        <div class="section-title">💬 Botão de Suporte</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Aparece flutuante em todas as páginas. Ao clicar, o usuário escolhe entre chat Nexia ou WhatsApp. Deixe o número vazio para ocultar o botão.</div>
+        <div class="field">
+          <label>Número do WhatsApp (DDI + DDD + número, sem + ou espaços)</label>
+          <input type="text" id="supportPhone" placeholder="Ex: 5511999999999"/>
+        </div>
+        <div class="field">
+          <label>Mensagem padrão no WhatsApp</label>
+          <input type="text" id="supportMsg" placeholder="Ex: Olá! Preciso de ajuda com o Nexia."/>
+        </div>
+        <div class="field">
+          <label>Link do Chat de Suporte (URL interna ou externa)</label>
+          <input type="text" id="supportChatUrl" placeholder="Ex: /chat.html ou https://..."/>
+        </div>
+        <button onclick="saveSupport()" style="background:#25d366;border:none;border-radius:8px;padding:10px 20px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">💾 Salvar configuração de suporte</button>
+      </div>
     </div>
 
     <!-- SEGURANÇA -->
@@ -928,7 +946,19 @@ async function loadAnnounceSettings(){
     if(d.bannerType) document.getElementById('bannerType').value = d.bannerType||'';
     document.getElementById('maintenanceStatus').textContent = d.maintenance ? '🔴 Ativo' : '🟢 Inativo';
     document.getElementById('registrationStatus').textContent = d.allowRegistration===false ? '🔴 Bloqueado' : '🟢 Permitido';
+    if(d.supportPhone) document.getElementById('supportPhone').value = d.supportPhone;
+    if(d.supportMsg) document.getElementById('supportMsg').value = d.supportMsg;
+    if(d.supportChatUrl) document.getElementById('supportChatUrl').value = d.supportChatUrl;
   }catch(e){}
+}
+
+async function saveSupport(){
+  const phone = document.getElementById('supportPhone').value.trim();
+  const msg = document.getElementById('supportMsg').value.trim();
+  const chatUrl = document.getElementById('supportChatUrl').value.trim();
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supportPhone:phone,supportMsg:msg,supportChatUrl:chatUrl})});
+  if(r.ok){ toast('✅ Suporte salvo!','ok'); logChange('Suporte: número/link atualizado'); }
+  else toast('Erro.','err');
 }
 
 async function saveBanner(){
