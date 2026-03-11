@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexia — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f0f;--card:#141414;--surface:#1a1a1a;--border:#252525;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#4f8ef7;--purple:#c084fc;--orange:#fb923c;--mistral:#ff7000}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;flex-shrink:0}
+header h1{font-size:15px;font-weight:600}
+.badge{border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600}
+.badge.creator{background:rgba(168,85,247,.15);color:#c084fc}
+.badge.admin{background:rgba(25,195,125,.15);color:var(--accent)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.header-email{font-size:12px;color:var(--muted)}
+.btn-sm{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer}
+.btn-sm:hover{color:var(--text)}
+.layout{display:flex;flex:1;min-height:0;overflow:hidden}
+.sidenav{width:220px;background:var(--card);border-right:1px solid var(--border);padding:16px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;overflow-y:auto}
+.nav-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;padding:12px 10px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;font-size:13px;cursor:pointer;color:var(--muted);transition:all .15s}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:var(--surface);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.nav-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.nav-bottom{margin-top:auto;padding-top:12px}
+.nav-chat{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,rgba(25,195,125,.12),rgba(79,142,247,.08));border:1px solid rgba(25,195,125,.2);border-radius:10px;padding:10px 12px;cursor:pointer;text-decoration:none;color:var(--text);font-size:13px;font-weight:500}
+.nav-chat:hover{filter:brightness(1.1)}
+.main{flex:1;overflow-y:auto;padding:28px 32px;height:100%}
+.tab-page{display:none}
+.tab-page.active{display:block}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px}
+.section-title{font-size:14px;font-weight:600;margin-bottom:14px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.stat-label{font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:30px;font-weight:700;line-height:1}
+.stat-value.green{color:var(--accent)}.stat-value.blue{color:var(--blue)}.stat-value.purple{color:var(--purple)}.stat-value.orange{color:var(--orange)}
+.chart-bars{display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:6px}
+.chart-bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:3px}
+.chart-bar{width:100%;border-radius:3px 3px 0 0;background:var(--accent);opacity:.7;min-height:2px}
+.chart-bar:hover{opacity:1}
+.chart-label{font-size:9px;color:var(--muted);text-align:center}
+.hourly-chart{display:flex;align-items:flex-end;gap:3px;height:56px}
+.hourly-bar{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;position:relative;cursor:default}
+.hourly-bar:hover::after{content:attr(data-tip);position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:10px;white-space:nowrap;z-index:10}
+.hourly-labels{display:flex;gap:3px;margin-top:4px}
+.hourly-label{flex:1;text-align:center;font-size:9px;color:var(--muted)}
+.pills-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px}
+.pill-dot{width:7px;height:7px;border-radius:50%}
+.pill-dot.groq{background:var(--accent)}.pill-dot.gemini{background:var(--blue)}.pill-dot.model{background:var(--purple)}
+.pill-count{color:var(--muted);font-size:11px}
+.online-list{display:flex;flex-direction:column;gap:6px}
+.online-row{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:8px;padding:8px 12px}
+.odot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.odot.now{background:#19c37d;box-shadow:0 0 6px #19c37d;animation:pulse 1.5s infinite}
+.odot.recent{background:#f5a623}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.online-email{font-size:13px;flex:1}.online-time{font-size:11px;color:var(--muted)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.api-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.api-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+.api-card-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.api-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.api-card-title{font-size:14px;font-weight:600}.api-card-sub{font-size:11px;color:var(--muted)}
+.key-status{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--muted)}
+.kdot{width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:all .3s}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+label{font-size:12px;color:var(--muted)}
+input,select{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;width:100%}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+.btn-save{border:none;border-radius:8px;padding:9px 16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%}
+.users-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+.btn-add{background:var(--accent);border:none;border-radius:8px;padding:9px 16px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.users-table{width:100%;border-collapse:collapse}
+.users-table th{text-align:left;font-size:11px;font-weight:500;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.5px}
+.users-table td{padding:12px 14px;border-bottom:1px solid rgba(42,42,42,.5);font-size:13px;vertical-align:middle}
+.users-table tr:last-child td{border-bottom:none}
+.role-badge{display:inline-block;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600}
+.role-creator{background:rgba(168,85,247,.15);color:#c084fc}
+.role-admin{background:rgba(79,142,247,.15);color:#93c5fd}
+.role-user{background:rgba(107,114,128,.15);color:#9ca3af}
+.kb{font-size:10px;border-radius:4px;padding:2px 6px;font-weight:600}
+.kb.groq{background:rgba(25,195,125,.15);color:var(--accent)}
+.kb.gemini{background:rgba(79,142,247,.15);color:var(--blue)}
+.kb.none{background:rgba(107,114,128,.1);color:var(--muted)}
+.act-btns{display:flex;gap:6px;flex-wrap:wrap}
+.btn-role{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;cursor:pointer}
+.btn-role:hover{color:var(--text)}
+.btn-del{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:4px 10px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:11px;cursor:pointer}
+.btn-del:hover{background:rgba(239,68,68,.2)}
+.color-preset{width:26px;height:26px;border-radius:6px;cursor:pointer;transition:transform .15s;flex-shrink:0}
+.color-preset:hover{transform:scale(1.2)}
+.bk-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;flex-wrap:wrap}
+.db-stat{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border-radius:10px;margin-bottom:8px}
+.db-stat-label{font-size:13px;color:var(--muted)}.db-stat-val{font-size:14px;font-weight:600}
+.db-table{width:100%;border-collapse:collapse;font-size:13px}
+.db-table th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.db-table td{padding:10px 12px;border-bottom:1px solid rgba(42,42,42,.4);font-family:monospace}
+.db-table tr:last-child td{border-bottom:none}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:none;z-index:999}
+.toast.show{display:block}
+.toast.ok{border-color:rgba(25,195,125,.4);color:var(--accent)}
+.toast.err{border-color:rgba(239,68,68,.4);color:#fca5a5}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+.overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:420px}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:6px}
+.modal>p{font-size:13px;color:var(--muted);margin-bottom:16px}
+.modal-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.modal-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.btn-cancel{background:none;border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer}
+.btn-primary{background:var(--accent);border:none;border-radius:8px;padding:8px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.mob-header{display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;align-items:center;gap:12px}
+.hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;line-height:1}
+@media(max-width:800px){
+  .sidenav{display:none!important}
+  .main{padding:16px;padding-top:68px}
+  header{display:none!important}
+  .mob-header{display:flex!important}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .api-grid,.two-col{grid-template-columns:1fr}
+  body{height:auto;min-height:100vh;overflow:auto}
+  .layout{overflow:visible;flex:1}
+}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;backdrop-filter:blur(2px)}
+.mob-overlay.show{display:block}
+.mob-drawer{position:fixed;left:-280px;top:0;bottom:0;width:280px;background:var(--card);border-right:1px solid var(--border);z-index:301;transition:left .25s ease;display:flex;flex-direction:column;overflow-y:auto}
+.mob-drawer.open{left:0}
+.mob-drawer-header{padding:20px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.mob-nav-item{display:flex;align-items:center;gap:12px;padding:13px 16px;font-size:14px;cursor:pointer;color:var(--muted);transition:all .15s;border-radius:0}
+.mob-nav-item:hover,.mob-nav-item.active{background:var(--surface);color:var(--text)}
+.mob-nav-item.active{border-left:3px solid var(--accent)}
+.mob-nav-icon{font-size:17px;width:22px;text-align:center}
+.mob-nav-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;padding:14px 16px 4px}
+.mob-nav-bottom{margin-top:auto;padding:16px}
+</style>
+</head>
+<body>
+
+<!-- Desktop header -->
+<!-- Mobile header -->
+<div class="mob-header">
+  <button class="hamburger" onclick="openDrawer()">☰</button>
+  <img src="/logo.png" style="width:26px;height:26px;border-radius:7px;object-fit:cover" alt="">
+  <span style="font-size:15px;font-weight:600">Nexia Admin</span>
+  <span class="badge" id="roleBadgeMob" style="margin-left:4px"></span>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+    <span id="headerEmailMob" style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+  </div>
+</div>
+
+<header>
+  <img src="/logo.png" style="width:28px;height:28px;border-radius:8px;object-fit:cover" alt="Nexia">
+  <h1>Nexia Admin</h1>
+  <span class="badge" id="roleBadge"></span>
+  <div class="header-right">
+    <span class="header-email" id="headerEmail"></span>
+    <button class="btn-sm" onclick="doLogout()">← Sair</button>
+  </div>
+</header>
+
+<!-- Mobile overlay + drawer -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeDrawer()"></div>
+<div class="mob-drawer" id="mobDrawer">
+  <div class="mob-drawer-header">
+    <img src="/logo.png" style="width:32px;height:32px;border-radius:9px;object-fit:cover">
+    <div>
+      <div style="font-size:14px;font-weight:600">Nexia Admin</div>
+      <div id="drawerEmail" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <div class="mob-nav-label">Geral</div>
+  <div class="mob-nav-item active" onclick="showTab('dashboard');closeDrawer()" id="mbnDashboard">
+    <span class="mob-nav-icon">📊</span><span>Dashboard</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('users');closeDrawer()" id="mbnUsers">
+    <span class="mob-nav-icon">👥</span><span>Usuários</span>
+  </div>
+
+  <div class="mob-nav-label" id="mbnLabelConfig" style="display:none">Configuração</div>
+  <div class="mob-nav-item" onclick="showTab('apikeys');closeDrawer()" id="mbnApikeys" style="display:none">
+    <span class="mob-nav-icon">🔑</span><span>API Keys</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('backup');closeDrawer()" id="mbnBackup" style="display:none">
+    <span class="mob-nav-icon">🔄</span><span>Backup Keys</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('theme');closeDrawer()" id="mbnTheme" style="display:none">
+    <span class="mob-nav-icon">🎨</span><span>Tema</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('branding');closeDrawer()" id="mbnBranding" style="display:none">
+    <span class="mob-nav-icon">🖼️</span><span>Personalizar App</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('sharedrooms');closeDrawer()" id="mbnSharedRooms" style="display:none">
+    <span class="mob-nav-icon">💞</span><span>Chats Compartilhados</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('database');closeDrawer()" id="mbnDatabase" style="display:none">
+    <span class="mob-nav-icon">🗄️</span><span>Banco de Dados</span>
+  </div>
+
+  <div class="mob-nav-bottom">
+    <a href="/chat.html" style="display:flex;align-items:center;gap:10px;background:rgba(25,195,125,.1);border:1px solid rgba(25,195,125,.2);border-radius:10px;padding:12px 14px;color:var(--text);text-decoration:none;font-size:14px">
+      <span style="font-size:18px">💬</span><span>Abrir Chat</span>
+    </a>
+    <button onclick="doLogout()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);border-radius:10px;padding:11px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">← Sair</button>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="sidenav">
+    <div class="nav-label">Geral</div>
+    <div class="nav-item active" onclick="showTab('dashboard')">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="showTab('users')">
+      <span class="nav-icon">👥</span><span>Usuários</span>
+    </div>
+
+    <div class="nav-label" id="navLabelConfig" style="display:none">Configuração</div>
+    <div class="nav-item" onclick="showTab('apikeys')" id="navApikeys" style="display:none">
+      <span class="nav-icon">🔑</span><span>API Keys</span>
+    </div>
+    <div class="nav-item" onclick="showTab('backup')" id="navBackup" style="display:none">
+      <span class="nav-icon">🔄</span><span>Backup Keys</span>
+    </div>
+    <div class="nav-item" onclick="showTab('theme')" id="navTheme" style="display:none">
+      <span class="nav-icon">🎨</span><span>Tema</span>
+    </div>
+    <div class="nav-item" onclick="showTab('branding')" id="navBranding" style="display:none">
+      <span class="nav-icon">🖼️</span><span>Personalizar App</span>
+    </div>
+    <div class="nav-item" onclick="showTab('sharedrooms')" id="navSharedRooms" style="display:none">
+      <span class="nav-icon">💞</span><span>Chats Compartilhados</span>
+    </div>
+    <div class="nav-item" onclick="showTab('database')" id="navDatabase" style="display:none">
+      <span class="nav-icon">🗄️</span><span>Banco de Dados</span>
+    </div>
+
+    <div class="nav-bottom">
+      <a class="nav-chat" href="/chat.html">
+        <span style="font-size:18px">💬</span><span class="nc-text">Abrir Chat</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="tab-page active" id="tab-dashboard">
+      <div class="page-title">📊 Dashboard</div>
+      <div class="page-sub">Estatísticas em tempo real da plataforma</div>
+      <div class="stats-grid" style="margin-bottom:20px">
+        <div class="stat-card"><div class="stat-label">Usuários</div><div class="stat-value green" id="statUsers">—</div></div>
+        <div class="stat-card"><div class="stat-label">Conversas</div><div class="stat-value blue" id="statConvs">—</div></div>
+        <div class="stat-card"><div class="stat-label">Mensagens</div><div class="stat-value purple" id="statMsgs">—</div></div>
+        <div class="stat-card"><div class="stat-label">Admins</div><div class="stat-value orange" id="statAdmins">—</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">📈 Conversas por dia (últimas 2 semanas)</div>
+        <div class="chart-bars" id="chartBars"></div>
+      </div>
+      <div class="two-col">
+        <div class="section">
+          <div class="section-title">🟢 Online agora <span id="onlineCount" style="color:#19c37d;font-size:12px;font-weight:400"></span></div>
+          <div class="online-list" id="onlineList"><div style="font-size:12px;color:var(--muted)">Carregando...</div></div>
+        </div>
+        <div class="section">
+          <div class="section-title">⏱ Atividade por hora (hoje)</div>
+          <div class="hourly-chart" id="hourlyChart"></div>
+          <div class="hourly-labels" id="hourlyLabels"></div>
+          <div style="margin-top:16px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">🤖 Provedores usados</div>
+            <div class="pills-row" id="providerPills"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div class="tab-page" id="tab-users">
+      <div class="users-header">
+        <div>
+          <div class="page-title">👥 Usuários</div>
+          <div class="page-sub" style="margin-bottom:0">Gerencie todos os usuários da plataforma</div>
+        </div>
+        <button class="btn-add" onclick="openAddUser()">+ Novo usuário</button>
+      </div>
+      <div class="section" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+<div id="usersTbody" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API KEYS -->
+    <div class="tab-page" id="tab-apikeys">
+      <div class="page-title">🔑 API Keys Globais</div>
+      <div class="page-sub">Configure as keys para cada provedor. Usuários sem key própria usam essas.</div>
+      <div class="api-grid">
+        <div class="api-card">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(25,195,125,.15)">⚡</div>
+            <div><div class="api-card-title">Groq</div><div class="api-card-sub">LLaMA · Gratuito</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="groqDot"></div><span id="groqInfo">Verificando...</span></div>
+          <div class="field"><label>Modelo padrão</label>
+            <select id="groqModel">
+              <option value="llama-3.3-70b-versatile">LLaMA 3.3 70B</option>
+              <option value="llama-3.1-8b-instant">LLaMA 3.1 8B</option>
+              <option value="llama-3.2-90b-vision-preview">LLaMA 3.2 90B</option>
+              <option value="llama-3.2-11b-vision-preview">LLaMA 3.2 11B</option>
+            </select>
+          </div>
+          <div class="field"><label>API Key (gsk_...)</label><input type="password" id="groqKeyInput" placeholder="Cole a key do Groq..."/></div>
+          <button class="btn-save" style="background:var(--accent);color:#000" onclick="saveGroq()">Salvar Groq</button>
+        </div>
+        <div class="api-card">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(79,142,247,.15)">✨</div>
+            <div><div class="api-card-title">Gemini</div><div class="api-card-sub">Google · Gratuito</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="geminiDot"></div><span id="geminiInfo">Verificando...</span></div>
+          <div class="field"><label>Modelo padrão</label>
+            <select id="geminiModel">
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+              <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            </select>
+          </div>
+          <div class="field"><label>API Key</label><input type="password" id="geminiKeyInput" placeholder="Cole a key do Gemini..."/></div>
+          <button class="btn-save" style="background:var(--blue);color:#fff" onclick="saveGemini()">Salvar Gemini</button>
+        </div>
+        <div class="api-card" style="border-color:rgba(255,112,0,.2)">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(255,112,0,.15)">🔥</div>
+            <div><div class="api-card-title">Mistral AI</div><div class="api-card-sub">Mistral · Gratuito</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="mistralDot"></div><span id="mistralInfo">Verificando...</span></div>
+          <div class="field"><label>Modelo padrão</label>
+            <select id="mistralModel">
+              <option value="mistral-large-latest">Mistral Large</option>
+              <option value="mistral-small-latest">Mistral Small</option>
+              <option value="codestral-latest">Codestral</option>
+              <option value="open-mistral-7b">Mistral 7B</option>
+            </select>
+          </div>
+          <div class="field"><label>API Key</label><input type="password" id="mistralKeyInput" placeholder="Cole a key do Mistral..."/></div>
+          <button class="btn-save" style="background:#ff7000;color:#fff" onclick="saveMistral()">Salvar Mistral</button>
+        </div>
+        <div class="api-card" style="border-color:rgba(124,58,237,.2)">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(124,58,237,.15)">🌐</div>
+            <div><div class="api-card-title">Nexia (OpenRouter)</div><div class="api-card-sub">50+ modelos gratuitos</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="openrouterDot"></div><span id="openrouterInfo">Verificando...</span></div>
+          <div class="field"><label>Modelo padrão</label>
+            <select id="openrouterModel">
+              <option value="openrouter/auto">Nexia Auto</option>
+              <option value="openrouter/free">Nexia Free</option>
+            </select>
+          </div>
+          <div class="field"><label>API Key (sk-or-...)</label><input type="password" id="openrouterKeyInput" placeholder="Cole a key do OpenRouter..."/></div>
+          <button class="btn-save" style="background:#7c3aed;color:#fff" onclick="saveOpenRouter()">Salvar Nexia</button>
+        </div>
+
+        <div class="api-card" style="border-color:rgba(249,115,22,.3)">
+          <div class="api-card-header">
+            <div class="api-icon" style="background:rgba(249,115,22,.15);font-size:20px">🎨</div>
+            <div><div class="api-card-title">Cloudflare AI</div><div class="api-card-sub">Geração de imagens · Grátis</div></div>
+          </div>
+          <div class="key-status"><div class="kdot" id="cfDot" style="background:#333"></div><span id="cfInfo">Verificando...</span></div>
+          <div class="field"><label>Account ID</label><input type="text" id="cfAccountInput" placeholder="c7dc19a209cbcf..."/></div>
+          <div class="field"><label>API Token</label><input type="password" id="cfTokenInput" placeholder="Cole o token do Cloudflare..."/></div>
+          <button class="btn-save" style="background:#f97316;color:#fff" onclick="saveCF()">Salvar Cloudflare</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKUP KEYS -->
+    <div class="tab-page" id="tab-backup">
+      <div class="page-title">🔄 Keys de Backup</div>
+      <div class="page-sub">Quando uma key principal falha, o sistema usa a próxima automaticamente.</div>
+      <div class="section">
+        <div class="section-title">Adicionar key de backup</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <select id="bkProvider" style="flex:1;min-width:140px">
+            <option value="groq">Groq</option>
+            <option value="gemini">Gemini</option>
+            <option value="mistral">Mistral</option>
+            <option value="openrouter">Nexia (OpenRouter)</option>
+          </select>
+          <input type="text" id="bkLabel" placeholder="Nome (ex: Key 2)" style="flex:1;min-width:140px">
+        </div>
+        <div style="display:flex;gap:10px">
+          <input type="password" id="bkKey" placeholder="Cole a API key de backup..." style="flex:1">
+          <button onclick="addBackupKey()" style="background:var(--accent);border:none;border-radius:8px;padding:10px 20px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ Adicionar</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Keys cadastradas</div>
+        <div id="backupKeysList"><div style="font-size:12px;color:var(--muted)">Carregando...</div></div>
+      </div>
+    </div>
+
+    <!-- TEMA -->
+    <div class="tab-page" id="tab-theme">
+      <div class="page-title">🎨 Personalização do Tema</div>
+      <div class="page-sub">Mude as cores para todos os usuários em tempo real.</div>
+      <div class="two-col">
+        <div class="api-card">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:10px">Cor de destaque</label>
+          <div style="display:flex;gap:12px;align-items:center">
+            <input type="color" id="themeAccent" value="#19c37d" style="width:48px;height:48px;border:none;border-radius:10px;cursor:pointer;padding:0;flex-shrink:0">
+            <div><div style="font-size:14px;font-weight:600" id="themeAccentLabel">#19c37d</div><div style="font-size:11px;color:var(--muted)">Botões, links, ativo</div></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+            <div class="color-preset" style="background:#19c37d" data-target="themeAccent" data-val="#19c37d"></div>
+            <div class="color-preset" style="background:#7c3aed" data-target="themeAccent" data-val="#7c3aed"></div>
+            <div class="color-preset" style="background:#4f8ef7" data-target="themeAccent" data-val="#4f8ef7"></div>
+            <div class="color-preset" style="background:#f43f5e" data-target="themeAccent" data-val="#f43f5e"></div>
+            <div class="color-preset" style="background:#f5a623" data-target="themeAccent" data-val="#f5a623"></div>
+            <div class="color-preset" style="background:#06b6d4" data-target="themeAccent" data-val="#06b6d4"></div>
+            <div class="color-preset" style="background:#a855f7" data-target="themeAccent" data-val="#a855f7"></div>
+            <div class="color-preset" style="background:#ff7000" data-target="themeAccent" data-val="#ff7000"></div>
+          </div>
+        </div>
+        <div class="api-card">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:10px">Cor de fundo</label>
+          <div style="display:flex;gap:12px;align-items:center">
+            <input type="color" id="themeBg" value="#0f0f0f" style="width:48px;height:48px;border:none;border-radius:10px;cursor:pointer;padding:0;flex-shrink:0">
+            <div><div style="font-size:14px;font-weight:600" id="themeBgLabel">#0f0f0f</div><div style="font-size:11px;color:var(--muted)">Fundo principal</div></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+            <div class="color-preset" style="background:#0f0f0f;border:1px solid #333" data-target="themeBg" data-val="#0f0f0f"></div>
+            <div class="color-preset" style="background:#111827" data-target="themeBg" data-val="#111827"></div>
+            <div class="color-preset" style="background:#0d1117" data-target="themeBg" data-val="#0d1117"></div>
+            <div class="color-preset" style="background:#1a1a2e" data-target="themeBg" data-val="#1a1a2e"></div>
+            <div class="color-preset" style="background:#0f172a" data-target="themeBg" data-val="#0f172a"></div>
+          </div>
+        </div>
+        <div class="api-card">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:10px">Cor da sidebar</label>
+          <div style="display:flex;gap:12px;align-items:center">
+            <input type="color" id="themeSidebar" value="#171717" style="width:48px;height:48px;border:none;border-radius:10px;cursor:pointer;padding:0;flex-shrink:0">
+            <div><div style="font-size:14px;font-weight:600" id="themeSidebarLabel">#171717</div><div style="font-size:11px;color:var(--muted)">Painel lateral</div></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+            <div class="color-preset" style="background:#171717;border:1px solid #333" data-target="themeSidebar" data-val="#171717"></div>
+            <div class="color-preset" style="background:#161b22" data-target="themeSidebar" data-val="#161b22"></div>
+            <div class="color-preset" style="background:#1e1b4b" data-target="themeSidebar" data-val="#1e1b4b"></div>
+            <div class="color-preset" style="background:#1a1a2e" data-target="themeSidebar" data-val="#1a1a2e"></div>
+          </div>
+        </div>
+        <div class="api-card">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:10px">Cor dos cards</label>
+          <div style="display:flex;gap:12px;align-items:center">
+            <input type="color" id="themeSurface" value="#1e1e1e" style="width:48px;height:48px;border:none;border-radius:10px;cursor:pointer;padding:0;flex-shrink:0">
+            <div><div style="font-size:14px;font-weight:600" id="themeSurfaceLabel">#1e1e1e</div><div style="font-size:11px;color:var(--muted)">Cards e modais</div></div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">
+            <div class="color-preset" style="background:#1e1e1e;border:1px solid #333" data-target="themeSurface" data-val="#1e1e1e"></div>
+            <div class="color-preset" style="background:#21262d" data-target="themeSurface" data-val="#21262d"></div>
+            <div class="color-preset" style="background:#1e1b4b" data-target="themeSurface" data-val="#1e1b4b"></div>
+            <div class="color-preset" style="background:#1e293b" data-target="themeSurface" data-val="#1e293b"></div>
+          </div>
+        </div>
+      </div>
+      <div class="section" style="margin-top:16px">
+        <div class="section-title">Prévia</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+          <div id="prevBg" style="width:56px;height:40px;border-radius:8px;border:1px solid #333"></div>
+          <div id="prevSidebar" style="width:56px;height:40px;border-radius:8px"></div>
+          <div id="prevSurface" style="width:56px;height:40px;border-radius:8px"></div>
+          <div id="prevAccent" style="width:56px;height:40px;border-radius:8px"></div>
+          <div id="prevBtn" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;color:#000">Botão</div>
+          <div id="prevBadge" style="padding:8px 16px;border-radius:20px;font-size:12px;border:1px solid #333">Badge</div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button onclick="saveTheme()" style="flex:1;background:var(--accent);border:none;border-radius:8px;padding:12px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💾 Aplicar para todos</button>
+          <button onclick="resetTheme()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 18px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">↺ Padrão</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERSONALIZAR APP -->
+    <div class="tab-page" id="tab-branding">
+      <div class="page-title">🖼️ Personalizar App</div>
+      <div class="page-sub">Mude o nome e o logo do app para todos os usuários.</div>
+      <div class="two-col">
+        <div class="section">
+          <div class="section-title">Nome do App</div>
+          <div class="field">
+            <label>Nome exibido no app</label>
+            <input type="text" id="brandingName" placeholder="Ex: Nexia, MeuBot, IA Pro..."/>
+          </div>
+          <button onclick="saveBranding()" style="width:100%;background:var(--accent);border:none;border-radius:8px;padding:11px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💾 Salvar Nome</button>
+        </div>
+        <div class="section">
+          <div class="section-title">Logo do App</div>
+          <div style="text-align:center;margin-bottom:16px">
+            <img id="currentLogo" src="/logo.png" style="width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid var(--border)">
+            <p style="font-size:11px;color:var(--muted);margin-top:8px">Logo atual</p>
+          </div>
+          <div class="field">
+            <label>Enviar nova imagem (PNG/JPG, máx 2MB)</label>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/jpg" style="cursor:pointer"/>
+          </div>
+          <div id="logoPreviewWrap" style="display:none;text-align:center;margin-bottom:12px">
+            <img id="logoPreview" style="width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid var(--accent)">
+            <p style="font-size:11px;color:var(--accent);margin-top:6px">Preview nova imagem</p>
+          </div>
+          <button onclick="uploadLogo()" style="width:100%;background:var(--blue);border:none;border-radius:8px;padding:11px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">⬆️ Enviar Logo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHATS COMPARTILHADOS -->
+    <div class="tab-page" id="tab-sharedrooms">
+      <div class="page-title">💞 Chats Compartilhados</div>
+      <div class="page-sub">Veja todas as salas de chat compartilhado ativas na plataforma.</div>
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="section-title" style="margin-bottom:0">Salas ativas</div>
+          <button onclick="loadSharedRooms()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🔄 Atualizar</button>
+        </div>
+        <div id="sharedRoomsList"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
+      </div>
+    </div>
+
+    <!-- BANCO DE DADOS -->
+    <div class="tab-page" id="tab-database">
+      <div class="page-title">🗄️ Banco de Dados</div>
+      <div class="page-sub">Visão geral do banco Railway PostgreSQL.</div>
+      <div class="section">
+        <div class="section-title">Informações gerais</div>
+        <div id="dbStats"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">📋 Tabelas</div>
+        <table class="db-table">
+          <thead><tr><th>Tabela</th><th>Registros</th><th>Descrição</th></tr></thead>
+          <tbody id="dbTbody"><tr><td colspan="3" style="color:var(--muted);text-align:center;padding:20px">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="section">
+        <div class="section-title" style="color:#fca5a5">⚠️ Zona de Perigo</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Ações irreversíveis. Use com cuidado.</div>
+        <button onclick="clearConversations()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:10px 18px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🗑 Limpar conversas com +90 dias</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal novo usuário -->
+<div class="overlay" id="addUserOverlay" onclick="closeOut(event,'addUserOverlay')">
+  <div class="modal">
+    <h3>Novo Usuário</h3>
+    <p>Crie uma conta para um novo usuário.</p>
+    <div class="modal-field"><label>Email</label><input type="email" id="newEmail" placeholder="email@exemplo.com"/></div>
+    <div class="modal-field"><label>Senha</label><input type="password" id="newPass" placeholder="mínimo 6 caracteres"/></div>
+    <div class="modal-field" id="roleWrap" style="display:none">
+      <label>Papel</label>
+      <select id="newRole"><option value="user">👤 Usuário</option><option value="admin">🛡 Admin</option></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('addUserOverlay').classList.remove('show')">Cancelar</button>
+      <button class="btn-primary" onclick="addUser()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // Só redireciona pro Chrome se vier de app externo (Instagram, WhatsApp, etc.)
+  (function(){
+    const ua = navigator.userAgent||'';
+    const isInApp = /Instagram|FBAN|FBAV|Twitter|Line|WhatsApp|Snapchat|TikTok/.test(ua);
+    if(isInApp){
+      const url = window.location.href;
+      window.location.replace('intent://'+url.replace(/https?:\/\//,'')+' #Intent;scheme=https;package=com.android.chrome;end');
+    }
+  })();
+
+let me = null, statsData = null;
+
+function openDrawer(){
+  document.getElementById('mobDrawer').classList.add('open');
+  document.getElementById('mobOverlay').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('mobDrawer').classList.remove('open');
+  document.getElementById('mobOverlay').classList.remove('show');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelector(`.nav-item[onclick="showTab('${name}')"]`)?.classList.add('active');
+  if (name==='database') loadDbInfo();
+  if (name==='backup') loadBackupKeys();
+  if (name==='users') loadUsers();
+  if (name==='sharedrooms') loadSharedRooms();
+}
+
+async function init() {
+  const r = await fetch('/api/me');
+  if (r.status===401){window.location.href='/';return;}
+  me = await r.json();
+  if (me.role==='user'){window.location.href='/chat.html';return;}
+  document.getElementById('headerEmail').textContent = me.email;
+    document.getElementById('headerEmailMob').textContent = me.email;
+    document.getElementById('drawerEmail').textContent = me.email;
+    const mobBadge = document.getElementById('roleBadgeMob');
+    if(mobBadge){ mobBadge.textContent = me.role==='creator'?'👑 Criador':me.role==='admin'?'🛡 Admin':'👤 Usuário'; mobBadge.className='badge '+(me.role==='creator'?'creator':'admin'); }
+  const badge = document.getElementById('roleBadge');
+  badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
+  badge.className = `badge ${me.role}`;
+  if (me.role==='creator') {
+    ['mbnApikeys','mbnBackup','mbnTheme','mbnBranding','mbnSharedRooms','mbnDatabase'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.style.display='flex';
+    });
+    const lbl = document.getElementById('mbnLabelConfig');
+    if(lbl) lbl.style.display='block';
+    ['navLabelConfig','navApikeys','navBackup','navTheme','navBranding','navSharedRooms','navDatabase'].forEach(id=>{
+      document.getElementById(id).style.display='';
+    });
+    loadConfig();
+  } else {
+    // admins can see shared rooms too
+    const el = document.getElementById('mbnSharedRooms');
+    if(el) el.style.display='flex';
+    const el2 = document.getElementById('navSharedRooms');
+    if(el2) el2.style.display='';
+  }
+  loadStats();
+  loadUsers();
+  loadOnline();
+  initThemeControls();
+  loadBranding();
+  setInterval(loadOnline, 30000);
+}
+
+async function loadStats() {
+  const r = await fetch('/api/admin/stats');
+  if (!r.ok) return;
+  const d = await r.json();
+  statsData = d;
+  document.getElementById('statUsers').textContent = d.totalUsers;
+  document.getElementById('statConvs').textContent = d.totalConvs;
+  document.getElementById('statMsgs').textContent = d.totalMsgs;
+  document.getElementById('statAdmins').textContent = d.totalAdmins;
+  const el = document.getElementById('chartBars');
+  if (!d.dailyUsage?.length) { el.innerHTML='<span style="color:var(--muted);font-size:12px">Sem dados ainda</span>'; }
+  else {
+    const max = Math.max(...d.dailyUsage.map(x=>parseInt(x.c)),1);
+    el.innerHTML = d.dailyUsage.map(x=>`<div class="chart-bar-col"><div class="chart-bar" style="height:${Math.max(4,Math.round(parseInt(x.c)/max*76))}px" title="${x.day}: ${x.c}"></div><div class="chart-label">${(x.day||'').slice(5)}</div></div>`).join('');
+  }
+  const pp = document.getElementById('providerPills');
+  pp.innerHTML = (d.providerUsage||[]).map(p=>`<div class="pill"><div class="pill-dot ${p.provider}"></div>${p.provider}<span class="pill-count">${p.c}</span></div>`).join('')||'<span style="color:var(--muted);font-size:12px">Sem dados</span>';
+}
+
+async function loadOnline() {
+  try {
+    const r = await fetch('/api/admin/online');
+    if (!r.ok) return;
+    const d = await r.json();
+    const list = document.getElementById('onlineList');
+    const count = document.getElementById('onlineCount');
+    const all = [...(d.online||[]).map(u=>({...u,status:'now'})),...(d.recent||[]).map(u=>({...u,status:'recent'}))];
+    count.textContent = d.online?.length?`(${d.online.length})`:'';
+    list.innerHTML = all.length ? all.map(u=>{
+      const ago = Math.floor(Date.now()/1000)-u.last_seen;
+      const t = ago<60?'agora mesmo':ago<3600?`há ${Math.floor(ago/60)} min`:`há ${Math.floor(ago/3600)}h`;
+      return `<div class="online-row"><div class="odot ${u.status}"></div><span class="online-email">${u.email}</span><span class="online-time">${t}</span></div>`;
+    }).join('') : '<div style="font-size:12px;color:var(--muted)">Nenhum ativo recentemente</div>';
+    const hourMap={};
+    (d.hourly||[]).forEach(h=>hourMap[parseInt(h.hour)]=parseInt(h.c));
+    const maxH=Math.max(...Object.values(hourMap),1);
+    const nowH=new Date().getHours();
+    let bars='',labels='';
+    for(let h=0;h<24;h++){
+      const v=hourMap[h]||0;
+      bars+=`<div class="hourly-bar" style="height:${Math.max(Math.round(v/maxH*100),2)}%;background:${h===nowH?'#19c37d':'var(--accent)'};opacity:${h===nowH?1:0.5}" data-tip="${h}h: ${v}"></div>`;
+      labels+=`<div class="hourly-label">${h%4===0?h+'h':''}</div>`;
+    }
+    document.getElementById('hourlyChart').innerHTML=bars;
+    document.getElementById('hourlyLabels').innerHTML=labels;
+  }catch(e){}
+}
+
+async function loadConfig() {
+  const r = await fetch('/api/admin/config');
+  if (!r.ok) return;
+  const d = await r.json();
+  const dots = {groq:{id:'groqDot',color:'var(--accent)'},gemini:{id:'geminiDot',color:'var(--blue)'},mistral:{id:'mistralDot',color:'#ff7000'},openrouter:{id:'openrouterDot',color:'#7c3aed'}};
+  for(const [k,v] of Object.entries(dots)){
+    const has = d[`has${k.charAt(0).toUpperCase()+k.slice(1)}Key`];
+    const dot = document.getElementById(v.id);
+    if(dot){ dot.style.background=has?v.color:'#333'; dot.style.boxShadow=has?`0 0 6px ${v.color}`:'none'; }
+    const info = document.getElementById(k+'Info');
+    if(info) info.textContent = has?`✅ ${d[k+'KeyMasked']}`:'Nenhuma key configurada';
+  }
+  // Cloudflare status
+  const cfDot = document.getElementById('cfDot');
+  const cfInfo = document.getElementById('cfInfo');
+  if(cfDot){ cfDot.style.background=d.hasCfToken?'#f97316':'#333'; cfDot.style.boxShadow=d.hasCfToken?'0 0 6px #f97316':'none'; }
+  if(cfInfo) cfInfo.textContent = d.hasCfToken ? '✅ '+d.cfTokenMasked : 'Nenhuma key configurada';
+
+  if(d.groqModel) document.getElementById('groqModel').value=d.groqModel;
+  if(d.geminiModel) document.getElementById('geminiModel').value=d.geminiModel;
+  if(d.mistralModel) document.getElementById('mistralModel').value=d.mistralModel;
+  if(d.openrouterModel) document.getElementById('openrouterModel').value=d.openrouterModel;
+  if(d.theme){
+    document.getElementById('themeAccent').value=d.theme.accent;
+    document.getElementById('themeBg').value=d.theme.bg;
+    document.getElementById('themeSidebar').value=d.theme.sidebar;
+    document.getElementById('themeSurface').value=d.theme.surface;
+    updatePreview();
+  }
+}
+
+async function saveGroq(){
+  const groqKey=document.getElementById('groqKeyInput').value.trim();
+  const groqModel=document.getElementById('groqModel').value;
+  if(!groqKey)return toast('Cole a API key do Groq.','err');
+  const r=await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({groqKey,groqModel})});
+  if(!r.ok)return toast('Erro ao salvar.','err');
+  document.getElementById('groqKeyInput').value='';
+  toast('✅ Key do Groq salva!','ok');loadConfig();
+}
+async function saveGemini(){
+  const geminiKey=document.getElementById('geminiKeyInput').value.trim();
+  const geminiModel=document.getElementById('geminiModel').value;
+  if(!geminiKey)return toast('Cole a API key do Gemini.','err');
+  const r=await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({geminiKey,geminiModel})});
+  if(!r.ok)return toast('Erro ao salvar.','err');
+  document.getElementById('geminiKeyInput').value='';
+  toast('✅ Key do Gemini salva!','ok');loadConfig();
+}
+async function saveMistral(){
+  const mistralKey=document.getElementById('mistralKeyInput').value.trim();
+  const mistralModel=document.getElementById('mistralModel').value;
+  if(!mistralKey)return toast('Cole a API key do Mistral.','err');
+  const r=await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mistralKey,mistralModel})});
+  if(!r.ok)return toast('Erro ao salvar.','err');
+  document.getElementById('mistralKeyInput').value='';
+  toast('✅ Key do Mistral salva!','ok');loadConfig();
+}
+async function saveCF(){
+  const cfAccountId = document.getElementById('cfAccountInput').value.trim();
+  const cfApiToken = document.getElementById('cfTokenInput').value.trim();
+  if(!cfAccountId && !cfApiToken) return toast('Preencha o Account ID e/ou Token.','err');
+  const body = {};
+  if(cfAccountId) body.cfAccountId = cfAccountId;
+  if(cfApiToken) body.cfApiToken = cfApiToken;
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok) return toast('Erro ao salvar.','err');
+  document.getElementById('cfAccountInput').value='';
+  document.getElementById('cfTokenInput').value='';
+  toast('✅ Cloudflare AI configurado!','ok'); loadConfig();
+}
+
+async function saveOpenRouter(){
+  const openrouterKey=document.getElementById('openrouterKeyInput').value.trim();
+  const openrouterModel=document.getElementById('openrouterModel').value;
+  if(!openrouterKey)return toast('Cole a API key do OpenRouter.','err');
+  const r=await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({openrouterKey,openrouterModel})});
+  if(!r.ok)return toast('Erro ao salvar.','err');
+  document.getElementById('openrouterKeyInput').value='';
+  toast('✅ Key Nexia salva!','ok');loadConfig();
+}
+
+async function loadBackupKeys(){
+  const r=await fetch('/api/admin/backup-keys');
+  const keys=await r.json();
+  const el=document.getElementById('backupKeysList');
+  const pN={groq:'Groq',gemini:'Gemini',mistral:'Mistral',openrouter:'Nexia'};
+  const pC={groq:'#19c37d',gemini:'#4f8ef7',mistral:'#ff7000',openrouter:'#7c3aed'};
+  if(!keys.length){el.innerHTML='<div style="font-size:12px;color:var(--muted)">Nenhuma key de backup cadastrada.</div>';return;}
+  el.innerHTML=keys.map(k=>`<div class="bk-row">
+    <div style="width:8px;height:8px;border-radius:50%;background:${k.active?'#19c37d':'#555'}"></div>
+    <span style="background:${pC[k.provider]||'#555'}22;color:${pC[k.provider]||'#aaa'};border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600">${pN[k.provider]||k.provider}</span>
+    <span style="flex:1;font-size:13px">${k.label||'Sem nome'}</span>
+    <span style="font-size:12px;color:var(--muted);font-family:monospace">${k.key_masked}</span>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" ${k.active?'checked':''} onchange="toggleBackupKey(${k.id},this.checked)"> Ativa</label>
+    <button onclick="deleteBackupKey(${k.id})" style="background:rgba(239,68,68,.15);border:none;border-radius:6px;padding:4px 10px;color:#ef4444;cursor:pointer;font-size:12px">Remover</button>
+  </div>`).join('');
+}
+async function addBackupKey(){
+  const provider=document.getElementById('bkProvider').value;
+  const key_value=document.getElementById('bkKey').value.trim();
+  const label=document.getElementById('bkLabel').value.trim();
+  if(!key_value)return toast('Cole a API key.','err');
+  const r=await fetch('/api/admin/backup-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider,key_value,label})});
+  if(!r.ok)return toast('Erro ao adicionar.','err');
+  document.getElementById('bkKey').value='';document.getElementById('bkLabel').value='';
+  toast('✅ Key de backup adicionada!','ok');loadBackupKeys();
+}
+async function deleteBackupKey(id){if(!confirm('Remover?'))return;await fetch('/api/admin/backup-keys/'+id,{method:'DELETE'});toast('Removida.','ok');loadBackupKeys();}
+async function toggleBackupKey(id,active){await fetch('/api/admin/backup-keys/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})});}
+
+function updatePreview(){
+  const a=document.getElementById('themeAccent').value,bg=document.getElementById('themeBg').value,s=document.getElementById('themeSidebar').value,su=document.getElementById('themeSurface').value;
+  document.getElementById('prevAccent').style.background=a;
+  document.getElementById('prevBg').style.background=bg;
+  document.getElementById('prevSidebar').style.background=s;
+  document.getElementById('prevSurface').style.background=su;
+  document.getElementById('prevBtn').style.background=a;
+  document.getElementById('prevBadge').style.cssText+=`;border-color:${a};color:${a}`;
+  document.getElementById('themeAccentLabel').textContent=a;
+  document.getElementById('themeBgLabel').textContent=bg;
+  document.getElementById('themeSidebarLabel').textContent=s;
+  document.getElementById('themeSurfaceLabel').textContent=su;
+}
+function initThemeControls(){
+  ['themeAccent','themeBg','themeSidebar','themeSurface'].forEach(id=>document.getElementById(id).addEventListener('input',updatePreview));
+  document.querySelectorAll('.color-preset').forEach(el=>el.addEventListener('click',()=>{document.getElementById(el.dataset.target).value=el.dataset.val;updatePreview();}));
+  updatePreview();
+}
+async function saveTheme(){
+  const r=await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accentColor:document.getElementById('themeAccent').value,bgColor:document.getElementById('themeBg').value,sidebarColor:document.getElementById('themeSidebar').value,surfaceColor:document.getElementById('themeSurface').value})});
+  if(!r.ok)return toast('Erro ao salvar.','err');
+  toast('✅ Tema aplicado para todos!','ok');
+}
+async function resetTheme(){
+  await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accentColor:'#19c37d',bgColor:'#0f0f0f',sidebarColor:'#171717',surfaceColor:'#1e1e1e'})});
+  document.getElementById('themeAccent').value='#19c37d';document.getElementById('themeBg').value='#0f0f0f';document.getElementById('themeSidebar').value='#171717';document.getElementById('themeSurface').value='#1e1e1e';
+  updatePreview();toast('✅ Tema restaurado!','ok');
+}
+
+// ===== BRANDING =====
+function loadBranding(){
+  const name = localStorage.getItem('appName') || 'Nexia';
+  document.getElementById('brandingName').value = name;
+}
+
+function saveBranding(){
+  const name = document.getElementById('brandingName').value.trim() || 'Nexia';
+  localStorage.setItem('appName', name);
+  // Update admin header
+  document.querySelectorAll('h1').forEach(el => { if(el.textContent.includes('Admin')) el.textContent = name + ' Admin'; });
+  toast('✅ Nome atualizado! Recarregue o chat para ver.', 'ok');
+}
+
+document.getElementById('logoFile')?.addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ toast('Imagem muito grande! Máx 2MB.', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('logoPreview').src = e.target.result;
+    document.getElementById('logoPreviewWrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+async function uploadLogo(){
+  const file = document.getElementById('logoFile').files[0];
+  if(!file){ toast('Selecione uma imagem primeiro.', 'err'); return; }
+  const fd = new FormData();
+  fd.append('logo', file);
+  try{
+    const r = await fetch('/api/admin/logo', {method:'POST', body: fd});
+    if(!r.ok){ toast('Erro ao enviar logo.', 'err'); return; }
+    // Reload logo everywhere with cache bust
+    const newSrc = '/logo.png?t=' + Date.now();
+    document.getElementById('currentLogo').src = newSrc;
+    document.querySelectorAll('img[src*="logo.png"]').forEach(el => el.src = newSrc);
+    document.getElementById('logoPreviewWrap').style.display = 'none';
+    document.getElementById('logoFile').value = '';
+    toast('✅ Logo atualizado com sucesso!', 'ok');
+  }catch(e){ toast('Erro ao enviar logo.', 'err'); }
+}
+
+// ===== SHARED ROOMS =====
+async function loadSharedRooms(){
+  try{
+    const r = await fetch('/api/admin/shared-rooms');
+    if(!r.ok){ document.getElementById('sharedRoomsList').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Erro ao carregar.</div>'; return; }
+    const rooms = await r.json();
+    const el = document.getElementById('sharedRoomsList');
+    if(!rooms.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhuma sala ativa no momento.</div>'; return; }
+    el.innerHTML = rooms.map(room => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:16px;font-weight:700;color:#c084fc;letter-spacing:2px">${room.code}</span>
+          <span style="font-size:11px;color:var(--muted)">${room.age}</span>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
+          <span>👥 ${room.participants} participante(s)</span>
+          <span>💬 ${room.messageCount} mensagem(s)</span>
+        </div>
+        ${room.participants > 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${room.participantList.join(' · ')}</div>` : ''}
+        <button onclick="deleteSharedRoom('${room.code}')" style="margin-top:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:4px 12px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:11px;cursor:pointer">🗑 Encerrar sala</button>
+      </div>`).join('');
+  }catch(e){ document.getElementById('sharedRoomsList').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Erro ao carregar.</div>'; }
+}
+
+async function deleteSharedRoom(code){
+  if(!confirm(`Encerrar sala ${code}?`)) return;
+  const r = await fetch(`/api/admin/shared-rooms/${code}`, {method:'DELETE'});
+  if(r.ok){ toast('Sala encerrada.','ok'); loadSharedRooms(); }
+  else toast('Erro ao encerrar.','err');
+}
+
+async function loadDbInfo(){
+  try{
+    const r=await fetch('/api/admin/stats');const d=await r.json();
+    document.getElementById('dbStats').innerHTML=`
+      <div class="db-stat"><span class="db-stat-label">Banco</span><span class="db-stat-val">Railway PostgreSQL</span></div>
+      <div class="db-stat"><span class="db-stat-label">Usuários</span><span class="db-stat-val" style="color:var(--accent)">${d.totalUsers}</span></div>
+      <div class="db-stat"><span class="db-stat-label">Conversas</span><span class="db-stat-val" style="color:var(--blue)">${d.totalConvs}</span></div>
+      <div class="db-stat"><span class="db-stat-label">Mensagens estimadas</span><span class="db-stat-val" style="color:var(--purple)">${d.totalMsgs}</span></div>`;
+    document.getElementById('dbTbody').innerHTML=`
+      <tr><td>users</td><td style="color:var(--accent)">${d.totalUsers}</td><td style="color:var(--muted)">Contas de usuário</td></tr>
+      <tr><td>conversations</td><td style="color:var(--blue)">${d.totalConvs}</td><td style="color:var(--muted)">Histórico de conversas</td></tr>
+      <tr><td>config</td><td>—</td><td style="color:var(--muted)">API keys e configurações globais</td></tr>
+      <tr><td>backup_keys</td><td>—</td><td style="color:var(--muted)">Keys de backup por provedor</td></tr>
+      <tr><td>reset_tokens</td><td>—</td><td style="color:var(--muted)">Tokens de redefinição de senha</td></tr>`;
+  }catch(e){}
+}
+async function clearConversations(){
+  if(!confirm('Remover conversas com mais de 90 dias? Irreversível.'))return;
+  const cutoff=Math.floor(Date.now()/1000)-90*24*3600;
+  const r=await fetch('/api/admin/clear-old-conversations',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({cutoff})});
+  if(!r.ok)return toast('Endpoint não implementado ainda.','err');
+  const d=await r.json();toast(`✅ ${d.deleted} conversas removidas.`,'ok');loadStats();
+}
+
+async function loadUsers(){
+  const r=await fetch('/api/admin/users');const users=await r.json();
+  const byUser=statsData?.byUser||[];const tbody=document.getElementById('usersTbody');
+  if(!users.length){tbody.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhum usuário.</div>';return;}
+  tbody.innerHTML=users.map(u=>{
+    const now=Math.floor(Date.now()/1000),ago=u.last_seen?now-u.last_seen:null;
+    const onlineStr=!ago?'<span style="color:var(--muted);font-size:11px">nunca</span>':ago<300?'<span style="color:#19c37d;font-size:11px">● online</span>':ago<3600?`<span style="color:#f5a623;font-size:11px">há ${Math.floor(ago/60)}min</span>`:ago<86400?`<span style="color:var(--muted);font-size:11px">há ${Math.floor(ago/3600)}h</span>`:`<span style="color:var(--muted);font-size:11px">${new Date(u.last_seen*1000).toLocaleDateString('pt-BR')}</span>`;
+    const roleLabel=u.role==='creator'?'👑 Criador':u.role==='admin'?'🛡 Admin':'👤 Usuário';
+    const keysHtml=(u.hasGroqKey||u.hasGeminiKey)?`${u.hasGroqKey?'<span class="kb groq">Groq</span>':''}${u.hasGeminiKey?'<span class="kb gemini">Gemini</span>':''}`:'<span class="kb none">Global</span>';
+    const stat=byUser.find(s=>s.email===u.email);
+    const acts=[];
+    if(me.role==='creator'&&u.role!=='creator'){
+      if(u.role==='user')acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
+      if(u.role==='admin')acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
+      acts.push(`<button class="btn-role" onclick="resetPwd(${u.id},'${u.email}')">🔑</button>`);
+    }
+    if(u.role!=='creator')acts.push(`<button class="btn-del" onclick="delUser(${u.id},'${u.email}')">Remover</button>`);
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${u.email}</span>
+          <span class="role-badge role-${u.role}">${roleLabel}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">${onlineStr}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${keysHtml}</div>
+        <span style="color:var(--muted);font-size:11px">💬 ${stat?stat.convs:'0'} conv</span>
+        <span style="color:var(--muted);font-size:11px">📅 ${new Date(u.created_at*1000).toLocaleDateString('pt-BR')}</span>
+      </div>
+      ${acts.length?`<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap" class="act-btns">${acts.join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function openAddUser(){document.getElementById('newEmail').value='';document.getElementById('newPass').value='';document.getElementById('newRole').value='user';document.getElementById('roleWrap').style.display=me.role==='creator'?'flex':'none';document.getElementById('addUserOverlay').classList.add('show');}
+async function addUser(){const email=document.getElementById('newEmail').value.trim(),password=document.getElementById('newPass').value,role=document.getElementById('newRole').value;if(!email||!password)return toast('Preencha todos.','err');const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,role})});const d=await r.json();if(!r.ok)return toast(d.error,'err');document.getElementById('addUserOverlay').classList.remove('show');toast('✅ Usuário criado!','ok');loadStats();loadUsers();}
+async function changeRole(id,newRole){const r=await fetch(`/api/admin/users/${id}/role`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:newRole})});if(!r.ok)return toast((await r.json()).error,'err');toast('✅ Papel alterado!','ok');loadUsers();}
+async function resetPwd(id,email){const p=prompt(`Nova senha para ${email}:`);if(!p||p.length<6)return toast('Mínimo 6 caracteres.','err');const r=await fetch(`/api/admin/users/${id}/password`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p})});if(!r.ok)return toast((await r.json()).error,'err');toast('✅ Senha atualizada!','ok');}
+async function delUser(id,email){if(!confirm(`Remover ${email}?`))return;const r=await fetch(`/api/admin/users/${id}`,{method:'DELETE'});if(!r.ok)return toast((await r.json()).error,'err');toast('Removido.','ok');loadStats();loadUsers();}
+
+function closeOut(e,id){if(e.target.id===id)document.getElementById(id).classList.remove('show');}
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast show ${type}`;setTimeout(()=>t.classList.remove('show'),3000);}
+async function doLogout(){await fetch('/api/logout',{method:'POST'});window.location.href='/';}
+
+init();
+</script>
+</body>
+</html>
