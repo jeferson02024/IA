@@ -370,7 +370,17 @@ app.post('/api/chat', auth, async (req,res) => {
       apiKey = userData?.personal_mistral_key || ck.rows[0]?.value || process.env.MISTRAL_API_KEY;
       if (!apiKey) return res.status(503).json({ error:'Nenhuma API key do Mistral configurada.' });
     }
-    const defaultModels = {groq:'llama-3.3-70b-versatile',gemini:'gemini-2.0-flash',openrouter:'meta-llama/llama-4-scout:free',deepseek:'deepseek-chat',mistral:'mistral-large-latest'};
+    // Blacklist check
+    const blCfg = await q("SELECT value FROM config WHERE key='blacklist'");
+    const blacklist = blCfg.rows[0]?.value ? JSON.parse(blCfg.rows[0].value) : [];
+    if(blacklist.length){
+      const lastText = messages.filter(m=>m.role==='user').slice(-1)[0]?.content||'';
+      const textLower = (typeof lastText==='string'?lastText:JSON.stringify(lastText)).toLowerCase();
+      const blocked = blacklist.find(w=>textLower.includes(w));
+      if(blocked) return res.status(400).json({ error:`Mensagem bloqueada: contém palavra proibida.` });
+    }
+
+    const chatStart = Date.now();
     const usedModel = model || defaultModels[provider] || 'llama-3.3-70b-versatile';
     // Use fallback system only when not using personal key
     const hasPersonalKey = (provider==='groq' && userData?.personal_groq_key)
@@ -392,7 +402,7 @@ app.post('/api/chat', auth, async (req,res) => {
         : callMistral;
       reply = await tryWithFallback(provider, apiKey, callFn, usedModel, messages, systemPrompt);
     }
-    if (conversationId) {
+    recordResponseTime(provider, Date.now() - chatStart);
       const cr = await q('SELECT * FROM conversations WHERE id=$1 AND user_id=$2', [conversationId, req.user.id]);
       if (cr.rows.length) {
         const conv = cr.rows[0];
@@ -779,6 +789,112 @@ app.delete('/api/admin/clear-old-conversations', auth, role('creator'), async (r
     const r = await q('DELETE FROM conversations WHERE updated_at < $1', [cutoff]);
     res.json({ deleted: r.rowCount });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ===== ERROR LOG (in-memory, last 100) =====
+const errorLog = [];
+function logError(provider, model, message){
+  errorLog.push({ provider, model, message, ts: Date.now() });
+  if(errorLog.length > 100) errorLog.shift();
+}
+app.get('/api/admin/error-log', auth, role('creator','admin'), (req,res) => res.json(errorLog.slice().reverse()));
+app.delete('/api/admin/error-log', auth, role('creator'), (req,res) => { errorLog.length=0; res.json({ok:true}); });
+
+// ===== RESPONSE TIMES (in-memory) =====
+const responseTimes = {};
+function recordResponseTime(provider, ms){
+  if(!responseTimes[provider]) responseTimes[provider]={total:0,count:0};
+  responseTimes[provider].total += ms;
+  responseTimes[provider].count++;
+}
+app.get('/api/admin/response-times', auth, role('creator','admin'), (req,res) => {
+  const out = {};
+  Object.entries(responseTimes).forEach(([p,v]) => { out[p] = { avg: Math.round(v.total/v.count), count: v.count }; });
+  res.json(out);
+});
+
+// ===== TEST KEY =====
+app.post('/api/admin/test-key', auth, role('creator','admin'), async (req,res) => {
+  const { provider } = req.body;
+  try{
+    const keyMap = { groq:'global_groq_key', gemini:'global_gemini_key', mistral:'global_mistral_key', openrouter:'global_openrouter_key' };
+    const cfg = await q('SELECT value FROM config WHERE key=$1', [keyMap[provider]]);
+    const key = cfg.rows[0]?.value;
+    if(!key) return res.json({ ok:false, error:'Key não configurada.' });
+    const start = Date.now();
+    let ok = false, message = '';
+    if(provider==='groq'){
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.1-8b-instant',messages:[{role:'user',content:'hi'}],max_tokens:5}),signal:AbortSignal.timeout(10000)});
+      ok = r.ok; if(!ok){ const d=await r.json(); message=d.error?.message||'Erro'; }
+    } else if(provider==='gemini'){
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:'hi'}]}]}),signal:AbortSignal.timeout(10000)});
+      ok = r.ok; if(!ok){ const d=await r.json(); message=d.error?.message||'Erro'; }
+    } else if(provider==='mistral'){
+      const r = await fetch('https://api.mistral.ai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:'mistral-small-latest',messages:[{role:'user',content:'hi'}],max_tokens:5}),signal:AbortSignal.timeout(10000)});
+      ok = r.ok; if(!ok){ const d=await r.json(); message=d.message||'Erro'; }
+    } else if(provider==='openrouter'){
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:'openrouter/auto',messages:[{role:'user',content:'hi'}],max_tokens:5}),signal:AbortSignal.timeout(10000)});
+      ok = r.ok; if(!ok){ const d=await r.json(); message=d.error?.message||'Erro'; }
+    }
+    const latency = Date.now()-start;
+    if(ok) return res.json({ ok:true, message:'Respondendo normalmente', latency });
+    else return res.json({ ok:false, error: message, latency });
+  }catch(e){ res.json({ ok:false, error: e.message }); }
+});
+
+// ===== BLACKLIST =====
+app.get('/api/admin/blacklist', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const r = await q("SELECT value FROM config WHERE key='blacklist'");
+    const words = r.rows[0]?.value ? JSON.parse(r.rows[0].value) : [];
+    res.json({ words });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/blacklist', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const { words: newWords } = req.body;
+    const r = await q("SELECT value FROM config WHERE key='blacklist'");
+    const existing = r.rows[0]?.value ? JSON.parse(r.rows[0].value) : [];
+    const merged = [...new Set([...existing, ...newWords.map(w=>w.toLowerCase())])];
+    await q("INSERT INTO config (key,value) VALUES ('blacklist',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [JSON.stringify(merged)]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/admin/blacklist', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const { word } = req.body;
+    const r = await q("SELECT value FROM config WHERE key='blacklist'");
+    const existing = r.rows[0]?.value ? JSON.parse(r.rows[0].value) : [];
+    const filtered = existing.filter(w=>w!==word);
+    await q("INSERT INTO config (key,value) VALUES ('blacklist',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [JSON.stringify(filtered)]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+// ===== CHANGELOG =====
+app.get('/api/admin/changelog', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const r = await q("SELECT value FROM config WHERE key='changelog'");
+    const log = r.rows[0]?.value ? JSON.parse(r.rows[0].value) : [];
+    res.json(log.slice(-100).reverse());
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/changelog', auth, async (req,res) => {
+  try{
+    const { action } = req.body;
+    const r = await q("SELECT value FROM config WHERE key='changelog'");
+    const log = r.rows[0]?.value ? JSON.parse(r.rows[0].value) : [];
+    log.push({ action, email: req.user?.email||'sistema', ts: Date.now() });
+    const trimmed = log.slice(-500);
+    await q("INSERT INTO config (key,value) VALUES ('changelog',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [JSON.stringify(trimmed)]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+app.delete('/api/admin/changelog', auth, role('creator'), async (req,res) => {
+  try{
+    await q("DELETE FROM config WHERE key='changelog'");
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/theme', async (req,res) => {
