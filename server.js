@@ -844,6 +844,30 @@ app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/admin/shared-rooms', auth, role('creator','admin'), (req,res) => {
+  const now = Date.now();
+  const rooms = [];
+  sharedRooms.forEach((room, code) => {
+    const ageMs = now - room.createdAt;
+    const ageStr = ageMs < 60000 ? 'agora mesmo'
+      : ageMs < 3600000 ? `há ${Math.floor(ageMs/60000)}min`
+      : `há ${Math.floor(ageMs/3600000)}h`;
+    rooms.push({
+      code,
+      participants: room.participants.length,
+      participantList: room.participants,
+      messageCount: room.messages.length,
+      age: ageStr
+    });
+  });
+  res.json(rooms);
+});
+
+app.delete('/api/admin/shared-rooms/:code', auth, role('creator','admin'), (req,res) => {
+  sharedRooms.delete(req.params.code);
+  res.json({ ok: true });
+});
+
 // Logo upload route
 app.post('/api/admin/logo', auth, role('creator','admin'), async (req,res) => {
   try {
