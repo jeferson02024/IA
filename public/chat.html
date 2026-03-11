@@ -36,18 +36,43 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .conv-list{flex:1;overflow-y:auto;padding:4px 8px}
 .conv-list::-webkit-scrollbar{width:4px}
 .conv-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.conv-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--muted);transition:all .15s;position:relative}
+.conv-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--muted);transition:transform .2s,background .15s,opacity .15s;position:relative;overflow:hidden;touch-action:pan-y}
 .conv-item:hover{background:var(--surface);color:var(--text)}
 .conv-item.active{background:var(--surface);color:var(--text)}
+.conv-item.pinned{border-left:2px solid var(--accent)}
+.conv-item.swiping{transition:none}
+.conv-swipe-bg{position:absolute;right:0;top:0;bottom:0;background:#ef4444;display:flex;align-items:center;padding:0 16px;font-size:13px;color:#fff;pointer-events:none;opacity:0;transition:opacity .15s}
 .conv-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .conv-dot.groq{background:var(--accent)}
 .conv-dot.gemini{background:var(--blue)}
 .conv-dot.mistral{background:#ff7000}
 .conv-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.conv-del{display:none;background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:14px;border-radius:4px;flex-shrink:0}
-.conv-item:hover .conv-del{display:block}
+.conv-actions{display:none;gap:2px;flex-shrink:0}
+.conv-item:hover .conv-actions{display:flex}
+.conv-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:14px;border-radius:4px}
 .conv-del:hover{color:#ef4444}
+.conv-pin{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:12px;border-radius:4px}
+.conv-pin:hover{color:var(--accent)}
+.conv-folder-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:12px;border-radius:4px}
 .conv-empty{padding:16px 12px;font-size:12px;color:var(--muted);text-align:center}
+/* Search */
+.search-wrap{padding:4px 8px 0;position:relative}
+.search-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 10px 7px 30px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text);outline:none}
+.search-icon{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+/* Folders */
+.folder-section{padding:2px 8px}
+.folder-header{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;cursor:pointer;border-radius:6px}
+.folder-header:hover{background:var(--surface)}
+/* Quick modes */
+.quick-modes{display:flex;gap:6px;padding:6px 0 2px;overflow-x:auto;scrollbar-width:none}
+.quick-modes::-webkit-scrollbar{display:none}
+.qmode{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.qmode:hover,.qmode.active{border-color:var(--accent);color:var(--accent);background:rgba(25,195,125,.08)}
+/* Streaming cursor */
+.streaming-cursor{display:inline-block;width:2px;height:14px;background:var(--accent);margin-left:2px;vertical-align:middle;animation:blink .7s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+/* Memory badge */
+.mem-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.2);border-radius:6px;padding:2px 8px;font-size:11px;color:#c084fc;margin-bottom:8px}
 .sidebar-bottom{padding:8px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
 .user-info{padding:8px 12px;font-size:12px;color:var(--muted);background:var(--surface);border-radius:8px;margin-bottom:4px}
 .user-info span{color:var(--text);font-weight:500;display:block;margin-bottom:1px}
@@ -178,11 +203,23 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
       </div>
     </div>
     <div class="sidebar-section" style="padding:10px 12px 4px">Conversas</div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="convSearch" placeholder="Buscar conversas..." oninput="filterConvs(this.value)">
+    </div>
+    <div class="quick-modes" id="quickModes" style="padding:6px 12px 2px">
+      <button class="qmode active" data-mode="" onclick="setQuickMode(this,'')">✨ Normal</button>
+      <button class="qmode" data-mode="code" onclick="setQuickMode(this,'code')">💻 Código</button>
+      <button class="qmode" data-mode="write" onclick="setQuickMode(this,'write')">📝 Redação</button>
+      <button class="qmode" data-mode="fun" onclick="setQuickMode(this,'fun')">🎮 Diversão</button>
+      <button class="qmode" data-mode="analyze" onclick="setQuickMode(this,'analyze')">🧠 Análise</button>
+    </div>
     <div class="conv-list" id="convList"><div class="conv-empty">Nenhuma conversa ainda</div></div>
     <div class="sidebar-bottom">
       <div class="user-info" id="userInfo">Carregando...</div>
       <button class="sidebar-btn admin-btn" id="adminBtn" style="display:none" onclick="window.location.href='/admin.html'">🛡 &nbsp;Painel Admin</button>
       <button class="sidebar-btn" onclick="openSettings()">⚙️ &nbsp;Configurações</button>
+      <button class="sidebar-btn" onclick="summarizeChat()" id="summarizeBtn" style="display:none;color:#f5a623">📋 &nbsp;Resumir conversa</button>
       <button class="sidebar-btn" onclick="openShare()" style="color:#19c37d">📤 &nbsp;Compartilhar Nexia</button>
       <button class="sidebar-btn" onclick="openSharedChat()" style="color:#f472b6">💞 &nbsp;Chat Compartilhado</button>
       <button class="sidebar-btn danger" onclick="doLogout()">← &nbsp;Sair</button>
@@ -216,6 +253,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
         <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Anexar imagem ou ZIP">📎</button>
         <input type="file" id="fileInput" style="display:none" accept="image/*,.zip,.txt,.js,.py,.json,.md,.html,.css" onchange="handleFile(this)">
         <textarea id="userInput" placeholder="Envie uma mensagem..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button id="voiceBtn" onclick="toggleVoice()" title="Falar" style="width:32px;height:32px;border-radius:8px;background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:16px">🎤</button>
         <button id="sendBtn" onclick="send()"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
       </div>
       <div class="input-hint">Enter para enviar · Shift+Enter para nova linha · 📎 imagens e ZIP</div>
@@ -467,15 +505,158 @@ async function loadConversations(){
   renderConvList();
 }
 
+let convSearchQuery = '', pinnedIds = new Set(JSON.parse(localStorage.getItem('pinnedConvs')||'[]')), convFolders = JSON.parse(localStorage.getItem('convFolders')||'{}');
+let activeQuickMode = '', memoryFacts = JSON.parse(localStorage.getItem('nexiaMemory')||'[]');
+
+function savePinned(){ localStorage.setItem('pinnedConvs', JSON.stringify([...pinnedIds])); }
+function saveFolders(){ localStorage.setItem('convFolders', JSON.stringify(convFolders)); }
+function saveMemory(){ localStorage.setItem('nexiaMemory', JSON.stringify(memoryFacts)); }
+
+function filterConvs(q){ convSearchQuery = q.toLowerCase(); renderConvList(); }
+
+function setQuickMode(btn, mode){
+  document.querySelectorAll('.qmode').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeQuickMode = mode;
+  const modePrompts = {
+    code: 'Você é Nexia, especialista em programação. Prefira respostas com código, seja técnico e preciso. Responda em português.',
+    write: 'Você é Nexia, especialista em redação e escrita criativa. Ajude com textos, revisões e criatividade. Responda em português.',
+    fun: 'Você é Nexia em modo divertido! Seja animado, use emojis, faça piadas e torne a conversa leve e alegre. Responda em português.',
+    analyze: 'Você é Nexia em modo analítico. Analise profundamente, dê insights detalhados, compare opções e seja criterioso. Responda em português.',
+  };
+  globalSystemPrompt = modePrompts[mode] || null;
+  const names = {code:'💻 Código',write:'📝 Redação',fun:'🎮 Diversão',analyze:'🧠 Análise'};
+  if(mode) toast(`Modo ${names[mode]} ativado`,'ok');
+}
+
 function renderConvList(){
-  const el=document.getElementById('convList');
-  if(!conversations.length){el.innerHTML='<div class="conv-empty">Nenhuma conversa ainda</div>';return;}
-  el.innerHTML=conversations.map(c=>`
-    <div class="conv-item${currentConvId===c.id?' active':''}" onclick="loadConversation(${c.id})">
+  const el = document.getElementById('convList');
+  let convs = conversations;
+
+  // Filter by search
+  if(convSearchQuery) convs = convs.filter(c => c.title.toLowerCase().includes(convSearchQuery));
+
+  if(!convs.length){ el.innerHTML='<div class="conv-empty">'+(convSearchQuery?'Nenhuma conversa encontrada':'Nenhuma conversa ainda')+'</div>'; return; }
+
+  // Separate pinned
+  const pinned = convs.filter(c => pinnedIds.has(c.id));
+  const unpinned = convs.filter(c => !pinnedIds.has(c.id));
+
+  // Group unpinned by folder
+  const folders = {};
+  const noFolder = [];
+  unpinned.forEach(c => {
+    const f = convFolders[c.id];
+    if(f){ if(!folders[f]) folders[f]=[]; folders[f].push(c); }
+    else noFolder.push(c);
+  });
+
+  const renderItem = c => {
+    const isPinned = pinnedIds.has(c.id);
+    const folder = convFolders[c.id]||'';
+    return `<div class="conv-item${currentConvId===c.id?' active':''}${isPinned?' pinned':''}" 
+      data-id="${c.id}"
+      onclick="loadConversation(${c.id})"
+      ontouchstart="swipeStart(event,${c.id})"
+      ontouchmove="swipeMove(event)"
+      ontouchend="swipeEnd(event,${c.id})">
+      <div class="conv-swipe-bg">🗑 Apagar</div>
       <div class="conv-dot ${c.provider}"></div>
-      <span class="conv-title">${escHtml(c.title)}</span>
-      <button class="conv-del" onclick="delConv(event,${c.id})">×</button>
-    </div>`).join('');
+      <span class="conv-title">${isPinned?'📌 ':''}${escHtml(c.title)}</span>
+      <div class="conv-actions">
+        <button class="conv-pin" onclick="togglePin(event,${c.id})" title="${isPinned?'Desafixar':'Fixar'}">${isPinned?'📌':'📍'}</button>
+        <button class="conv-folder-btn" onclick="setFolder(event,${c.id})" title="Pasta">📁</button>
+        <button class="conv-del" onclick="delConv(event,${c.id})">×</button>
+      </div>
+    </div>`;
+  };
+
+  let html = '';
+  if(pinned.length) html += `<div style="font-size:10px;color:var(--muted);padding:4px 10px;text-transform:uppercase;letter-spacing:.5px">📌 Fixadas</div>` + pinned.map(renderItem).join('');
+  Object.entries(folders).forEach(([name, items]) => {
+    html += `<div class="folder-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">📁 ${escHtml(name)} <span style="margin-left:auto;opacity:.5">${items.length}</span></div>
+    <div>${items.map(renderItem).join('')}</div>`;
+  });
+  if(noFolder.length) html += noFolder.map(renderItem).join('');
+  el.innerHTML = html;
+}
+
+function togglePin(e, id){
+  e.stopPropagation();
+  if(pinnedIds.has(id)) pinnedIds.delete(id); else pinnedIds.add(id);
+  savePinned(); renderConvList();
+  // Haptic
+  if(navigator.vibrate) navigator.vibrate(30);
+}
+
+function setFolder(e, id){
+  e.stopPropagation();
+  const name = prompt('Nome da pasta (deixe vazio para remover):');
+  if(name === null) return;
+  if(name.trim()) convFolders[id] = name.trim();
+  else delete convFolders[id];
+  saveFolders(); renderConvList();
+}
+
+// Swipe to delete
+let swipeStartX = 0, swipeEl = null;
+function swipeStart(e, id){
+  swipeStartX = e.touches[0].clientX;
+  swipeEl = e.currentTarget;
+  swipeEl.classList.add('swiping');
+}
+function swipeMove(e){
+  if(!swipeEl) return;
+  const dx = e.touches[0].clientX - swipeStartX;
+  if(dx < 0){
+    swipeEl.style.transform = `translateX(${Math.max(dx,-100)}px)`;
+    const bg = swipeEl.querySelector('.conv-swipe-bg');
+    if(bg) bg.style.opacity = Math.min(1, Math.abs(dx)/80);
+  }
+}
+function swipeEnd(e, id){
+  if(!swipeEl) return;
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  swipeEl.classList.remove('swiping');
+  if(dx < -70){
+    if(navigator.vibrate) navigator.vibrate([30,20,30]);
+    swipeEl.style.transform = 'translateX(-100%)';
+    swipeEl.style.opacity = '0';
+    setTimeout(() => delConvById(id), 250);
+  } else {
+    swipeEl.style.transform = '';
+    const bg = swipeEl.querySelector('.conv-swipe-bg');
+    if(bg) bg.style.opacity = '0';
+  }
+  swipeEl = null;
+}
+
+async function delConvById(id){
+  await fetch(`/api/conversations/${id}`,{method:'DELETE'});
+  if(currentConvId===id) newChat();
+  conversations = conversations.filter(c=>c.id!==id);
+  pinnedIds.delete(id); delete convFolders[id];
+  savePinned(); saveFolders(); renderConvList();
+}
+
+async function delConv(e, id){
+  e.stopPropagation();
+  if(navigator.vibrate) navigator.vibrate(20);
+  await delConvById(id);
+}
+
+// Summarize current conversation
+async function summarizeChat(){
+  if(!history.length){ toast('Nenhuma mensagem para resumir.','err'); return; }
+  const msgs = history.slice(-20).map(m=>({role:m.role,content:typeof m.content==='string'?m.content:JSON.stringify(m.content)}));
+  addMsg('user','📋 Resuma essa conversa em tópicos principais.','');
+  const tid = showTyping();
+  try{
+    const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:msgs,provider,model,systemPrompt:'Resuma a conversa acima em no máximo 5 tópicos curtos com bullet points. Seja conciso. Responda em português.'})});
+    const d = await r.json();
+    document.getElementById(tid)?.remove();
+    if(d.reply) addMsgStreaming('ai', d.reply, provider);
+  }catch(e){ document.getElementById(tid)?.remove(); toast('Erro ao resumir.','err'); }
 }
 
 async function loadConversation(id){
@@ -490,6 +671,13 @@ async function loadConversation(id){
   document.getElementById('welcome')?.remove();
   const c=document.getElementById('messages');
   c.innerHTML='';
+  // Show memory badge if has facts
+  if(memoryFacts.length){
+    const badge = document.createElement('div');
+    badge.style.cssText='padding:8px 16px;';
+    badge.innerHTML=`<span class="mem-badge">🧠 ${memoryFacts.length} memória(s) ativa(s)</span>`;
+    c.appendChild(badge);
+  }
   conv.messages.forEach(m=>{
     if(typeof m.content==='string') addMsg(m.role==='user'?'user':'ai',m.content,conv.provider);
     else addMsgComplex(m.role==='user'?'user':'ai',m.content,conv.provider);
@@ -497,17 +685,76 @@ async function loadConversation(id){
   c.scrollTop=c.scrollHeight;
   renderConvList();
   closeSidebar();
+  document.getElementById('summarizeBtn').style.display='flex';
 }
 
-async function delConv(e,id){
-  e.stopPropagation();
-  await fetch(`/api/conversations/${id}`,{method:'DELETE'});
-  if(currentConvId===id) newChat();
-  conversations=conversations.filter(c=>c.id!==id);
-  renderConvList();
+// ===== STREAMING ANIMATION =====
+function addMsgStreaming(role, fullText, prov){
+  const c=document.getElementById('messages');
+  const row=document.createElement('div');
+  row.className=`msg-row ${role}${prov&&role==='ai'?' '+prov:''}`;
+  const av=`<img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px">`;
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'msg-body';
+  row.innerHTML=`<div class="msg-inner"><div class="msg-av">${av}</div></div>`;
+  row.querySelector('.msg-inner').appendChild(bodyEl);
+  c.appendChild(row);
+
+  // Stream character by character
+  const words = fullText.split('');
+  let i = 0;
+  let displayed = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'streaming-cursor';
+  bodyEl.appendChild(cursor);
+
+  const interval = setInterval(()=>{
+    const chunk = words.slice(i, i+4).join('');
+    displayed += chunk;
+    i += 4;
+    bodyEl.innerHTML = fmt(displayed);
+    bodyEl.appendChild(cursor);
+    c.scrollTop = c.scrollHeight;
+    if(i >= words.length){
+      clearInterval(interval);
+      cursor.remove();
+      bodyEl.innerHTML = fmt(fullText);
+      c.scrollTop = c.scrollHeight;
+      // Extract memories from response
+      extractMemory(fullText);
+    }
+  }, 18);
+  if(navigator.vibrate) navigator.vibrate(10);
+  return row;
 }
 
-// File handling
+// ===== MEMORY SYSTEM =====
+function extractMemory(text){
+  // Detect if user shared personal info in last message
+  const lastUserMsg = history.filter(m=>m.role==='user').slice(-1)[0]?.content||'';
+  const patterns = [
+    {re:/(?:me chamo|meu nome é|sou o|sou a)\s+([A-ZÀ-Ú][a-zà-ú]+)/i, prefix:'Nome'},
+    {re:/(?:sou|trabalho como|sou um|sou uma)\s+(dev|desenvolvedor|designer|estudante|professor|médico|engenheiro[a]?)/i, prefix:'Profissão'},
+    {re:/(?:moro em|sou de)\s+([A-ZÀ-Ú][a-zà-ú\s]+)/i, prefix:'Local'},
+    {re:/(?:gosto de|adoro|curto)\s+([a-zà-ú\s]{4,30})/i, prefix:'Interesse'},
+  ];
+  patterns.forEach(({re, prefix}) => {
+    const m = String(lastUserMsg).match(re);
+    if(m && m[1]){
+      const fact = `${prefix}: ${m[1].trim()}`;
+      if(!memoryFacts.includes(fact)){
+        memoryFacts.push(fact);
+        if(memoryFacts.length > 20) memoryFacts.shift();
+        saveMemory();
+      }
+    }
+  });
+}
+
+function getMemoryPrompt(){
+  if(!memoryFacts.length) return '';
+  return `\n\n[Memória sobre o usuário: ${memoryFacts.join('; ')}]`;
+}
 async function handleFile(input){
   const file=input.files[0];
   if(!file)return;
@@ -634,6 +881,8 @@ async function send(){
 
   addMsg('user',displayText);
   input.value='';input.style.height='auto';
+  if(navigator.vibrate) navigator.vibrate(15);
+  document.getElementById('summarizeBtn').style.display='flex';
   history.push({role:'user',content:msgContent});
 
   if(!currentConvId){
@@ -650,7 +899,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:globalSystemPrompt||undefined})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:(globalSystemPrompt||'')+getMemoryPrompt()||undefined})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
@@ -682,13 +931,12 @@ async function send(){
         if(cleanReply) addMsg('ai', cleanReply, provider);
         generateImageFrontend(d.imagePrompt);
       } else if(imgTagMatch){
-        // IA retornou tag ##IMG## mas backend não detectou - frontend gera
-        if(cleanReply) addMsg('ai', cleanReply, provider);
+        if(cleanReply) addMsgStreaming('ai', cleanReply, provider);
         generateImageFrontend(imgTagMatch[1].trim());
       } else if(hasZip){
-        addMsg('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
+        addMsgStreaming('ai', '✅ Projeto pronto! Clique abaixo para baixar.', provider);
       } else {
-        if(cleanReply) addMsg('ai', cleanReply, provider);
+        if(cleanReply) addMsgStreaming('ai', cleanReply, provider);
       }
       // Salva cleanReply no histórico (sem tags)
       history.push({role:'assistant',content:cleanReply||d.reply});
@@ -1084,7 +1332,49 @@ function shareWhatsApp(){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-// ===== PROFILE =====
+// ===== VOZ PARA TEXTO =====
+let recognition = null, isListening = false;
+function toggleVoice(){
+  if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
+    toast('Seu navegador não suporta reconhecimento de voz.','err'); return;
+  }
+  if(isListening){ recognition?.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'pt-BR';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  const btn = document.getElementById('voiceBtn');
+  const input = document.getElementById('userInput');
+  const original = input.value;
+  recognition.onstart = () => {
+    isListening = true;
+    btn.style.background = 'rgba(239,68,68,.2)';
+    btn.style.borderColor = 'rgba(239,68,68,.4)';
+    btn.textContent = '🔴';
+    input.placeholder = 'Ouvindo...';
+  };
+  recognition.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r=>r[0].transcript).join('');
+    input.value = (original ? original + ' ' : '') + transcript;
+    autoResize(input);
+  };
+  recognition.onend = () => {
+    isListening = false;
+    btn.style.background = 'var(--surface)';
+    btn.style.borderColor = 'var(--border)';
+    btn.textContent = '🎤';
+    input.placeholder = 'Envie uma mensagem...';
+    if(input.value.trim()) input.focus();
+  };
+  recognition.onerror = (e) => {
+    isListening = false;
+    btn.style.background = 'var(--surface)';
+    btn.textContent = '🎤';
+    if(e.error !== 'no-speech') toast('Erro no microfone: '+e.error,'err');
+  };
+  recognition.start();
+}
 function loadProfile(){
   const name = localStorage.getItem('profileName') || '';
   const photo = localStorage.getItem('profilePhoto') || '';

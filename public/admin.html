@@ -103,8 +103,12 @@ input::placeholder{color:var(--muted)}
 .db-table th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .db-table td{padding:10px 12px;border-bottom:1px solid rgba(42,42,42,.4);font-family:monospace}
 .db-table tr:last-child td{border-bottom:none}
+.test-btn{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:9px 16px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;transition:all .15s}
+.test-btn:hover{border-color:var(--c,var(--accent));color:var(--c,var(--accent))}
+.bl-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;padding:4px 12px;font-size:12px;color:#fca5a5}
+.bl-tag button{background:none;border:none;color:#fca5a5;cursor:pointer;font-size:14px;line-height:1;padding:0}
 .pers-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .15s}
-.pers-card:hover{border-color:var(--accent);transform:scale(1.03)}
+.role-vip{background:rgba(245,166,35,.15);color:#f5a623}
 .pers-card.active{border-color:var(--accent);background:rgba(25,195,125,.08)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:none;z-index:999}
 .toast.show{display:block}
@@ -256,6 +260,15 @@ input::placeholder{color:var(--muted)}
     <div class="nav-item" onclick="showTab('security')" id="navSecurity" style="display:none">
       <span class="nav-icon">🔒</span><span>Segurança</span>
     </div>
+    <div class="nav-item" onclick="showTab('errorlog')" id="navErrorlog" style="display:none">
+      <span class="nav-icon">🐛</span><span>Log de Erros</span>
+    </div>
+    <div class="nav-item" onclick="showTab('blacklist')" id="navBlacklist" style="display:none">
+      <span class="nav-icon">🚫</span><span>Blacklist</span>
+    </div>
+    <div class="nav-item" onclick="showTab('changelog')" id="navChangelog" style="display:none">
+      <span class="nav-icon">📝</span><span>Histórico</span>
+    </div>
     <div class="nav-item" onclick="showTab('sharedrooms')" id="navSharedRooms" style="display:none">
       <span class="nav-icon">💞</span><span>Chats Compartilhados</span>
     </div>
@@ -310,11 +323,14 @@ input::placeholder{color:var(--muted)}
           <div class="page-title">👥 Usuários</div>
           <div class="page-sub" style="margin-bottom:0">Gerencie todos os usuários da plataforma</div>
         </div>
-        <button class="btn-add" onclick="openAddUser()">+ Novo usuário</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm" onclick="exportUsersCSV()" style="color:var(--accent);border-color:rgba(25,195,125,.3)">📥 Exportar CSV</button>
+          <button class="btn-add" onclick="openAddUser()">+ Novo usuário</button>
+        </div>
       </div>
       <div class="section" style="padding:0;overflow:hidden">
         <div style="overflow-x:auto">
-<div id="usersTbody" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
+          <div id="usersTbody" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
         </div>
       </div>
     </div>
@@ -685,6 +701,65 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- LOG DE ERROS -->
+    <div class="tab-page" id="tab-errorlog">
+      <div class="page-title">🐛 Log de Erros</div>
+      <div class="page-sub">Últimos erros de API registrados pelo servidor.</div>
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="section-title" style="margin:0">Erros recentes</div>
+          <button onclick="clearErrorLog()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:6px 14px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🗑 Limpar</button>
+        </div>
+        <div id="errorLogList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title">⚡ Testar API Keys</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Verifica se cada key configurada está respondendo corretamente.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button onclick="testKey('groq')" class="test-btn" style="--c:#19c37d">⚡ Testar Groq</button>
+          <button onclick="testKey('gemini')" class="test-btn" style="--c:#4f8ef7">✨ Testar Gemini</button>
+          <button onclick="testKey('mistral')" class="test-btn" style="--c:#ff7000">🔥 Testar Mistral</button>
+          <button onclick="testKey('openrouter')" class="test-btn" style="--c:#c084fc">🌐 Testar Nexia</button>
+        </div>
+        <div id="testResults" style="margin-top:14px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">📊 Tempo Médio de Resposta</div>
+        <div id="responseTimeStats"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+    </div>
+
+    <!-- BLACKLIST -->
+    <div class="tab-page" id="tab-blacklist">
+      <div class="page-title">🚫 Blacklist de Palavras</div>
+      <div class="page-sub">Mensagens com essas palavras serão bloqueadas antes de chegar à IA.</div>
+      <div class="section">
+        <div class="section-title">Adicionar palavra/frase</div>
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <input type="text" id="blacklistInput" placeholder="Ex: spam, palavrão, ..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addBlacklist()">
+          <button onclick="addBlacklist()" style="background:var(--accent);border:none;border-radius:8px;padding:10px 20px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Adicionar</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">Não diferencia maiúsculas/minúsculas. Use vírgula para adicionar várias de uma vez.</div>
+      </div>
+      <div class="section">
+        <div class="section-title">Palavras bloqueadas</div>
+        <div id="blacklistItems" style="display:flex;flex-wrap:wrap;gap:8px"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+    </div>
+
+    <!-- HISTÓRICO DE MUDANÇAS -->
+    <div class="tab-page" id="tab-changelog">
+      <div class="page-title">📝 Histórico de Mudanças</div>
+      <div class="page-sub">Registro de todas as alterações feitas nas configurações do admin.</div>
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="section-title" style="margin:0">Últimas alterações</div>
+          <button onclick="clearChangelog()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:6px 14px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🗑 Limpar</button>
+        </div>
+        <div id="changelogList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+    </div>
+
     <!-- CHATS COMPARTILHADOS -->
     <div class="tab-page" id="tab-sharedrooms">
       <div class="page-title">💞 Chats Compartilhados</div>
@@ -777,6 +852,9 @@ function showTab(name) {
   if (name==='personality') loadPersonality();
   if (name==='announce') loadAnnounceSettings();
   if (name==='security') loadSecurityLog();
+  if (name==='errorlog') { loadErrorLog(); loadResponseTimes(); }
+  if (name==='blacklist') loadBlacklist();
+  if (name==='changelog') loadChangelog();
 }
 
 // ===== PERSONALIDADE DA IA =====
@@ -887,6 +965,152 @@ async function forceLogoutAll(){
   else toast('Erro.','err');
 }
 
+// ===== EXPORTAR USUÁRIOS CSV =====
+async function exportUsersCSV(){
+  try{
+    const r = await fetch('/api/admin/users');
+    const users = await r.json();
+    const rows = [['Email','Role','Tem Key Groq','Tem Key Gemini','Tem Key OpenRouter','Criado em']];
+    users.forEach(u => rows.push([u.email, u.role, u.hasGroqKey?'Sim':'Não', u.hasGeminiKey?'Sim':'Não', u.hasOpenrouterKey?'Sim':'Não', u.created_at?new Date(u.created_at*1000).toLocaleString('pt-BR'):'']));
+    const csv = rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='usuarios_nexia.csv'; a.click();
+    toast('✅ CSV exportado!','ok');
+  }catch(e){ toast('Erro ao exportar.','err'); }
+}
+
+// ===== LOG DE ERROS =====
+async function loadErrorLog(){
+  try{
+    const r = await fetch('/api/admin/error-log');
+    const d = await r.json();
+    const el = document.getElementById('errorLogList');
+    if(!d.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">Nenhum erro registrado. 🎉</div>'; return; }
+    el.innerHTML = d.map(e=>`
+      <div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:8px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:12px;font-weight:600;color:#fca5a5">${e.provider||'?'} · ${e.model||'?'}</span>
+          <span style="font-size:11px;color:var(--muted)">${new Date(e.ts).toLocaleString('pt-BR')}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);word-break:break-word">${escHtml(e.message||'')}</div>
+      </div>`).join('');
+  }catch(e){ document.getElementById('errorLogList').innerHTML='<div style="color:var(--muted);font-size:13px">Erro ao carregar.</div>'; }
+}
+
+async function clearErrorLog(){
+  await fetch('/api/admin/error-log',{method:'DELETE'});
+  loadErrorLog(); toast('Log limpo.','ok');
+}
+
+// ===== TESTAR API KEYS =====
+async function testKey(provider){
+  const el = document.getElementById('testResults');
+  const row = document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px';
+  row.innerHTML=`<span style="color:var(--muted)">🔄 Testando ${provider}...</span>`;
+  el.appendChild(row);
+  try{
+    const r = await fetch('/api/admin/test-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider})});
+    const d = await r.json();
+    if(d.ok){
+      row.innerHTML=`<span style="color:var(--accent)">✅ ${provider}</span><span style="color:var(--muted);flex:1">${d.message||'Funcionando!'}</span><span style="font-size:11px;color:var(--muted)">${d.latency}ms</span>`;
+    } else {
+      row.innerHTML=`<span style="color:#fca5a5">❌ ${provider}</span><span style="color:var(--muted);flex:1">${d.error||'Falhou'}</span>`;
+    }
+  }catch(e){ row.innerHTML=`<span style="color:#fca5a5">❌ ${provider} — erro de conexão</span>`; }
+}
+
+// ===== TEMPO MÉDIO DE RESPOSTA =====
+async function loadResponseTimes(){
+  try{
+    const r = await fetch('/api/admin/response-times');
+    const d = await r.json();
+    const el = document.getElementById('responseTimeStats');
+    if(!Object.keys(d).length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">Sem dados ainda. Envie algumas mensagens primeiro.</div>'; return; }
+    el.innerHTML = Object.entries(d).map(([p,v])=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;min-width:100px;color:var(--text)">${p}</span>
+        <div style="flex:1;background:var(--bg);border-radius:6px;height:8px;overflow:hidden">
+          <div style="height:100%;background:var(--accent);width:${Math.min(100,(v.avg/5000)*100)}%;border-radius:6px"></div>
+        </div>
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap">${v.avg}ms avg · ${v.count} req</span>
+      </div>`).join('');
+  }catch(e){}
+}
+
+// ===== BLACKLIST =====
+async function loadBlacklist(){
+  try{
+    const r = await fetch('/api/admin/blacklist');
+    const d = await r.json();
+    const el = document.getElementById('blacklistItems');
+    if(!d.words?.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">Nenhuma palavra bloqueada.</div>'; return; }
+    el.innerHTML = d.words.map(w=>`
+      <div class="bl-tag">${escHtml(w)}<button onclick="removeBlacklist('${escHtml(w)}')" title="Remover">✕</button></div>`).join('');
+  }catch(e){}
+}
+
+async function addBlacklist(){
+  const input = document.getElementById('blacklistInput');
+  const words = input.value.split(',').map(w=>w.trim().toLowerCase()).filter(Boolean);
+  if(!words.length) return;
+  await fetch('/api/admin/blacklist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({words})});
+  input.value=''; loadBlacklist(); toast(`✅ ${words.length} palavra(s) adicionada(s).`,'ok');
+  logChange(`Blacklist: adicionadas ${words.join(', ')}`);
+}
+
+async function removeBlacklist(word){
+  await fetch('/api/admin/blacklist',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({word})});
+  loadBlacklist(); toast('Removida.','ok');
+  logChange(`Blacklist: removida "${word}"`);
+}
+
+// ===== HISTÓRICO DE MUDANÇAS =====
+async function loadChangelog(){
+  try{
+    const r = await fetch('/api/admin/changelog');
+    const d = await r.json();
+    const el = document.getElementById('changelogList');
+    if(!d.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">Nenhuma mudança registrada ainda.</div>'; return; }
+    el.innerHTML = d.map(c=>`
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start">
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;min-width:130px">${new Date(c.ts).toLocaleString('pt-BR')}</span>
+        <span style="font-size:12px;color:var(--muted);flex-shrink:0">${c.email||'sistema'}</span>
+        <span style="font-size:13px;color:var(--text);flex:1">${escHtml(c.action)}</span>
+      </div>`).join('');
+  }catch(e){}
+}
+
+async function clearChangelog(){
+  if(!confirm('Limpar todo o histórico?')) return;
+  await fetch('/api/admin/changelog',{method:'DELETE'});
+  loadChangelog(); toast('Histórico limpo.','ok');
+}
+
+async function logChange(action){
+  try{ await fetch('/api/admin/changelog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})}); }catch(e){}
+}
+
+// Patch savePersonality to log change
+const _origSavePersonality = typeof savePersonality==='function'?savePersonality:null;
+async function savePersonality(){
+  const mode = currentPersonalityMode;
+  const customPrompt = document.getElementById('customPrompt').value.trim();
+  const aiName = document.getElementById('aiName').value.trim();
+  const welcomeMsg = document.getElementById('welcomeMsg').value.trim();
+  const msgLimitPerDay = parseInt(document.getElementById('msgLimitPerDay').value)||0;
+  const maxTokens = parseInt(document.getElementById('maxTokens').value)||1024;
+  const systemPrompt = mode==='custom' ? customPrompt : personalityPrompts[mode];
+  try{
+    const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({personalityMode:mode,systemPrompt,customPrompt,aiName,welcomeMsg,msgLimitPerDay,maxTokens})});
+    if(!r.ok) return toast('Erro ao salvar.','err');
+    toast('✅ Personalidade salva!','ok');
+    logChange(`Personalidade alterada para: ${mode}${aiName?' · Nome: '+aiName:''}`);
+  }catch(e){ toast('Erro.','err'); }
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 async function init() {
   const r = await fetch('/api/me');
   if (r.status===401){window.location.href='/';return;}
@@ -902,12 +1126,11 @@ async function init() {
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
     ['mbnApikeys','mbnBackup','mbnPersonality','mbnTheme','mbnBranding','mbnAnnounce','mbnSecurity','mbnSharedRooms','mbnDatabase'].forEach(id=>{
-      const el = document.getElementById(id);
-      if(el) el.style.display='flex';
+      const el = document.getElementById(id); if(el) el.style.display='flex';
     });
     const lbl = document.getElementById('mbnLabelConfig');
     if(lbl) lbl.style.display='block';
-    ['navLabelConfig','navApikeys','navBackup','navPersonality','navTheme','navBranding','navAnnounce','navSecurity','navSharedRooms','navDatabase'].forEach(id=>{
+    ['navLabelConfig','navApikeys','navBackup','navPersonality','navTheme','navBranding','navAnnounce','navSecurity','navErrorlog','navBlacklist','navChangelog','navSharedRooms','navDatabase'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.style.display='';
     });
     loadConfig();
@@ -1262,13 +1485,15 @@ async function loadUsers(){
   tbody.innerHTML=users.map(u=>{
     const now=Math.floor(Date.now()/1000),ago=u.last_seen?now-u.last_seen:null;
     const onlineStr=!ago?'<span style="color:var(--muted);font-size:11px">nunca</span>':ago<300?'<span style="color:#19c37d;font-size:11px">● online</span>':ago<3600?`<span style="color:#f5a623;font-size:11px">há ${Math.floor(ago/60)}min</span>`:ago<86400?`<span style="color:var(--muted);font-size:11px">há ${Math.floor(ago/3600)}h</span>`:`<span style="color:var(--muted);font-size:11px">${new Date(u.last_seen*1000).toLocaleDateString('pt-BR')}</span>`;
-    const roleLabel=u.role==='creator'?'👑 Criador':u.role==='admin'?'🛡 Admin':'👤 Usuário';
+    const roleLabel=u.role==='creator'?'👑 Criador':u.role==='admin'?'🛡 Admin':u.role==='vip'?'⭐ VIP':'👤 Usuário';
     const keysHtml=(u.hasGroqKey||u.hasGeminiKey)?`${u.hasGroqKey?'<span class="kb groq">Groq</span>':''}${u.hasGeminiKey?'<span class="kb gemini">Gemini</span>':''}`:'<span class="kb none">Global</span>';
     const stat=byUser.find(s=>s.email===u.email);
     const acts=[];
     if(me.role==='creator'&&u.role!=='creator'){
-      if(u.role==='user')acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
-      if(u.role==='admin')acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
+      if(u.role==='user') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
+      if(u.role==='user') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'vip')" style="color:#f5a623;border-color:rgba(245,166,35,.3)">⭐ VIP</button>`);
+      if(u.role==='vip') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
+      if(u.role==='admin') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
       acts.push(`<button class="btn-role" onclick="resetPwd(${u.id},'${u.email}')">🔑</button>`);
     }
     if(u.role!=='creator')acts.push(`<button class="btn-del" onclick="delUser(${u.id},'${u.email}')">Remover</button>`);
