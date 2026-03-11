@@ -194,6 +194,9 @@ input::placeholder{color:var(--muted)}
   <div class="mob-nav-item" onclick="showTab('theme');closeDrawer()" id="mbnTheme" style="display:none">
     <span class="mob-nav-icon">🎨</span><span>Tema</span>
   </div>
+  <div class="mob-nav-item" onclick="showTab('branding');closeDrawer()" id="mbnBranding" style="display:none">
+    <span class="mob-nav-icon">🖼️</span><span>Personalizar App</span>
+  </div>
   <div class="mob-nav-item" onclick="showTab('database');closeDrawer()" id="mbnDatabase" style="display:none">
     <span class="mob-nav-icon">🗄️</span><span>Banco de Dados</span>
   </div>
@@ -225,6 +228,9 @@ input::placeholder{color:var(--muted)}
     </div>
     <div class="nav-item" onclick="showTab('theme')" id="navTheme" style="display:none">
       <span class="nav-icon">🎨</span><span>Tema</span>
+    </div>
+    <div class="nav-item" onclick="showTab('branding')" id="navBranding" style="display:none">
+      <span class="nav-icon">🖼️</span><span>Personalizar App</span>
     </div>
     <div class="nav-item" onclick="showTab('database')" id="navDatabase" style="display:none">
       <span class="nav-icon">🗄️</span><span>Banco de Dados</span>
@@ -476,6 +482,38 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- PERSONALIZAR APP -->
+    <div class="tab-page" id="tab-branding">
+      <div class="page-title">🖼️ Personalizar App</div>
+      <div class="page-sub">Mude o nome e o logo do app para todos os usuários.</div>
+      <div class="two-col">
+        <div class="section">
+          <div class="section-title">Nome do App</div>
+          <div class="field">
+            <label>Nome exibido no app</label>
+            <input type="text" id="brandingName" placeholder="Ex: Nexia, MeuBot, IA Pro..."/>
+          </div>
+          <button onclick="saveBranding()" style="width:100%;background:var(--accent);border:none;border-radius:8px;padding:11px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💾 Salvar Nome</button>
+        </div>
+        <div class="section">
+          <div class="section-title">Logo do App</div>
+          <div style="text-align:center;margin-bottom:16px">
+            <img id="currentLogo" src="/logo.png" style="width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid var(--border)">
+            <p style="font-size:11px;color:var(--muted);margin-top:8px">Logo atual</p>
+          </div>
+          <div class="field">
+            <label>Enviar nova imagem (PNG/JPG, máx 2MB)</label>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/jpg" style="cursor:pointer"/>
+          </div>
+          <div id="logoPreviewWrap" style="display:none;text-align:center;margin-bottom:12px">
+            <img id="logoPreview" style="width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid var(--accent)">
+            <p style="font-size:11px;color:var(--accent);margin-top:6px">Preview nova imagem</p>
+          </div>
+          <button onclick="uploadLogo()" style="width:100%;background:var(--blue);border:none;border-radius:8px;padding:11px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">⬆️ Enviar Logo</button>
+        </div>
+      </div>
+    </div>
+
     <!-- BANCO DE DADOS -->
     <div class="tab-page" id="tab-database">
       <div class="page-title">🗄️ Banco de Dados</div>
@@ -567,13 +605,13 @@ async function init() {
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
-    ['mbnApikeys','mbnBackup','mbnTheme','mbnDatabase'].forEach(id=>{
+    ['mbnApikeys','mbnBackup','mbnTheme','mbnBranding','mbnDatabase'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.style.display='flex';
     });
     const lbl = document.getElementById('mbnLabelConfig');
     if(lbl) lbl.style.display='block';
-    ['navLabelConfig','navApikeys','navBackup','navTheme','navDatabase'].forEach(id=>{
+    ['navLabelConfig','navApikeys','navBackup','navTheme','navBranding','navDatabase'].forEach(id=>{
       document.getElementById(id).style.display='';
     });
     loadConfig();
@@ -582,6 +620,7 @@ async function init() {
   loadUsers();
   loadOnline();
   initThemeControls();
+  loadBranding();
   setInterval(loadOnline, 30000);
 }
 
@@ -771,6 +810,50 @@ async function resetTheme(){
   await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accentColor:'#19c37d',bgColor:'#0f0f0f',sidebarColor:'#171717',surfaceColor:'#1e1e1e'})});
   document.getElementById('themeAccent').value='#19c37d';document.getElementById('themeBg').value='#0f0f0f';document.getElementById('themeSidebar').value='#171717';document.getElementById('themeSurface').value='#1e1e1e';
   updatePreview();toast('✅ Tema restaurado!','ok');
+}
+
+// ===== BRANDING =====
+function loadBranding(){
+  const name = localStorage.getItem('appName') || 'Nexia';
+  document.getElementById('brandingName').value = name;
+}
+
+function saveBranding(){
+  const name = document.getElementById('brandingName').value.trim() || 'Nexia';
+  localStorage.setItem('appName', name);
+  // Update admin header
+  document.querySelectorAll('h1').forEach(el => { if(el.textContent.includes('Admin')) el.textContent = name + ' Admin'; });
+  toast('✅ Nome atualizado! Recarregue o chat para ver.', 'ok');
+}
+
+document.getElementById('logoFile')?.addEventListener('change', function(){
+  const file = this.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ toast('Imagem muito grande! Máx 2MB.', 'err'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('logoPreview').src = e.target.result;
+    document.getElementById('logoPreviewWrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+async function uploadLogo(){
+  const file = document.getElementById('logoFile').files[0];
+  if(!file){ toast('Selecione uma imagem primeiro.', 'err'); return; }
+  const fd = new FormData();
+  fd.append('logo', file);
+  try{
+    const r = await fetch('/api/admin/logo', {method:'POST', body: fd});
+    if(!r.ok){ toast('Erro ao enviar logo.', 'err'); return; }
+    // Reload logo everywhere with cache bust
+    const newSrc = '/logo.png?t=' + Date.now();
+    document.getElementById('currentLogo').src = newSrc;
+    document.querySelectorAll('img[src*="logo.png"]').forEach(el => el.src = newSrc);
+    document.getElementById('logoPreviewWrap').style.display = 'none';
+    document.getElementById('logoFile').value = '';
+    toast('✅ Logo atualizado com sucesso!', 'ok');
+  }catch(e){ toast('Erro ao enviar logo.', 'err'); }
 }
 
 async function loadDbInfo(){
