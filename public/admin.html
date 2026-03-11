@@ -108,6 +108,7 @@ input::placeholder{color:var(--muted)}
 .bl-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:20px;padding:4px 12px;font-size:12px;color:#fca5a5}
 .bl-tag button{background:none;border:none;color:#fca5a5;cursor:pointer;font-size:14px;line-height:1;padding:0}
 .pers-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .15s}
+.role-subdono{background:rgba(167,139,250,.15);color:#a78bfa}
 .role-vip{background:rgba(245,166,35,.15);color:#f5a623}
 .pers-card.active{border-color:var(--accent);background:rgba(25,195,125,.08)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:none;z-index:999}
@@ -277,6 +278,9 @@ input::placeholder{color:var(--muted)}
     </div>
     <div class="nav-item" onclick="showTab('changelog')" id="navChangelog" style="display:none">
       <span class="nav-icon">📝</span><span>Histórico</span>
+    </div>
+    <div class="nav-item" onclick="showTab('support')" id="navSupport" style="display:none">
+      <span class="nav-icon">🎧</span><span>Suporte</span>
     </div>
     <div class="nav-item" onclick="showTab('sharedrooms')" id="navSharedRooms" style="display:none">
       <span class="nav-icon">💞</span><span>Chats Compartilhados</span>
@@ -787,6 +791,56 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- SUPORTE -->
+    <div class="tab-page" id="tab-support">
+      <div class="page-title">🎧 Suporte</div>
+      <div class="page-sub">Gerencie os tickets de suporte dos usuários e os números de WhatsApp.</div>
+
+      <div class="section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="section-title" style="margin:0">📋 Fila de Tickets</div>
+          <div style="display:flex;gap:8px">
+            <button onclick="loadTickets('open')" id="btnOpen" style="background:rgba(25,195,125,.15);border:1px solid rgba(25,195,125,.3);border-radius:8px;padding:6px 14px;color:var(--accent);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🟢 Abertos</button>
+            <button onclick="loadTickets('closed')" id="btnClosed" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">⚫ Encerrados</button>
+          </div>
+        </div>
+        <div id="ticketsList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+
+      <!-- Ticket modal inline -->
+      <div id="ticketModal" style="display:none">
+        <div class="section">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="section-title" style="margin:0" id="modalSubject">Ticket</div>
+            <button onclick="closeTicketModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+          </div>
+          <div id="modalMeta" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+          <div id="modalMessages" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:14px;padding-right:4px"></div>
+          <div id="modalActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+          <div style="display:flex;gap:8px" id="modalReplyRow">
+            <input type="text" id="modalReply" placeholder="Responder..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')sendSupportReply()">
+            <button onclick="sendSupportReply()" style="background:var(--accent);border:none;border-radius:8px;padding:9px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Enviar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">💬 Números de WhatsApp para Suporte</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Usuários que escolherem WhatsApp verão esses números.</div>
+        <div id="phonesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" id="newPhoneLabel" placeholder="Nome (ex: Jeferson)" style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none">
+          <input type="text" id="newPhoneNum" placeholder="5511999999999" style="flex:1;min-width:150px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none">
+          <button onclick="addPhone()" style="background:#25d366;border:none;border-radius:8px;padding:9px 18px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">+ Adicionar</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">📊 Estatísticas de Suporte</div>
+        <div id="supportStats"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+    </div>
+
     <!-- CHATS COMPARTILHADOS -->
     <div class="tab-page" id="tab-sharedrooms">
       <div class="page-title">💞 Chats Compartilhados</div>
@@ -882,6 +936,7 @@ function showTab(name) {
   if (name==='errorlog') { loadErrorLog(); loadResponseTimes(); }
   if (name==='blacklist') loadBlacklist();
   if (name==='changelog') loadChangelog();
+  if (name==='support') { loadTickets('open'); loadPhones(); loadSupportStats(); }
 }
 
 // ===== PERSONALIDADE DA IA =====
@@ -1148,6 +1203,165 @@ async function savePersonality(){
   }catch(e){ toast('Erro.','err'); }
 }
 
+// ===== SUPPORT TICKETS (ADMIN) =====
+let currentAdminTicket = null, ticketPoll = null;
+
+async function loadTickets(status='open'){
+  document.getElementById('btnOpen').style.background = status==='open'?'rgba(25,195,125,.15)':'var(--surface)';
+  document.getElementById('btnOpen').style.color = status==='open'?'var(--accent)':'var(--muted)';
+  document.getElementById('btnClosed').style.background = status==='closed'?'rgba(142,142,160,.15)':'var(--surface)';
+  document.getElementById('btnClosed').style.color = status==='closed'?'var(--text)':'var(--muted)';
+  closeTicketModal();
+  try{
+    const r = await fetch(`/api/support/tickets?status=${status}`);
+    const tickets = await r.json();
+    const el = document.getElementById('ticketsList');
+    if(!tickets.length){ el.innerHTML=`<div style="color:var(--muted);font-size:13px">Nenhum ticket ${status==='open'?'aberto':'encerrado'} no momento.</div>`; return; }
+    el.innerHTML = tickets.map(t=>`
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;cursor:pointer;margin-bottom:8px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'" onclick="openAdminTicket(${t.id})">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:600;flex:1">${escHtml(t.subject)}</span>
+          <span style="font-size:10px;color:var(--muted)">#${t.id}</span>
+          ${t.rating?`<span style="color:#f5a623;font-size:12px">${'⭐'.repeat(t.rating)}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap">
+          <span>👤 ${escHtml(t.user_email)}</span>
+          <span>${t.channel==='app'?'🤖 App':'💬 WhatsApp'}</span>
+          <span>${t.assigned_email?'Atribuído: '+escHtml(t.assigned_email):'<span style="color:#f5a623">⚡ Sem atendente</span>'}</span>
+          <span>${new Date(t.updated_at*1000).toLocaleString('pt-BR')}</span>
+        </div>
+      </div>`).join('');
+  }catch(e){ document.getElementById('ticketsList').innerHTML='<div style="color:var(--muted)">Erro ao carregar.</div>'; }
+}
+
+async function openAdminTicket(id){
+  currentAdminTicket = id;
+  document.getElementById('ticketModal').style.display='block';
+  await loadAdminTicket();
+  if(ticketPoll) clearInterval(ticketPoll);
+  ticketPoll = setInterval(loadAdminTicket, 4000);
+}
+
+function closeTicketModal(){
+  document.getElementById('ticketModal').style.display='none';
+  currentAdminTicket = null;
+  if(ticketPoll){ clearInterval(ticketPoll); ticketPoll=null; }
+}
+
+async function loadAdminTicket(){
+  if(!currentAdminTicket) return;
+  try{
+    const r = await fetch(`/api/support/tickets/${currentAdminTicket}`);
+    const t = await r.json();
+    document.getElementById('modalSubject').textContent = `#${t.id} — ${t.subject}`;
+    document.getElementById('modalMeta').innerHTML = `
+      <span>👤 ${escHtml(t.user_email)}</span> &nbsp;·&nbsp;
+      <span>${t.status==='open'?'🟢 Aberto':'⚫ Encerrado'}</span> &nbsp;·&nbsp;
+      <span>${t.assigned_email?'Atendente: '+escHtml(t.assigned_email):'Sem atendente'}</span>
+      ${t.rating?` &nbsp;·&nbsp; <span style="color:#f5a623">${'⭐'.repeat(t.rating)}</span>`:''}
+      ${t.rating_comment?` <span style="color:var(--muted)">"${escHtml(t.rating_comment)}"</span>`:''}`;
+    // Messages
+    const msgs = Array.isArray(t.messages)?t.messages:JSON.parse(t.messages||'[]');
+    const msgsEl = document.getElementById('modalMessages');
+    msgsEl.innerHTML = msgs.map(m=>`
+      <div style="max-width:85%;padding:8px 12px;border-radius:10px;font-size:13px;align-self:${m.role==='support'?'flex-end':'flex-start'};background:${m.role==='support'?'rgba(25,195,125,.15)':'var(--bg)'};border:1px solid ${m.role==='support'?'rgba(25,195,125,.2)':'var(--border)'}">
+        ${escHtml(m.text)}
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">${m.role==='support'?escHtml(m.email):'Usuário'} · ${new Date(m.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>`).join('');
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    // Actions
+    const actEl = document.getElementById('modalActions');
+    const acts = [];
+    if(t.status==='open'){
+      if(!t.assigned_to || t.assigned_to !== me?.id) acts.push(`<button onclick="claimTicket(${t.id})" style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.3);border-radius:8px;padding:7px 14px;color:var(--blue);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">⚡ Assumir atendimento</button>`);
+      acts.push(`<button onclick="closeTicket(${t.id})" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:7px 14px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">✅ Encerrar ticket</button>`);
+    }
+    actEl.innerHTML = acts.join('');
+    document.getElementById('modalReplyRow').style.display = t.status==='open'?'flex':'none';
+  }catch(e){}
+}
+
+async function claimTicket(id){
+  const r = await fetch(`/api/support/tickets/${id}/claim`,{method:'POST'});
+  if(r.ok){ toast('✅ Ticket assumido!','ok'); loadAdminTicket(); }
+  else{ const d=await r.json(); toast(d.error||'Erro.','err'); }
+}
+
+async function closeTicket(id){
+  if(!confirm('Encerrar este ticket?')) return;
+  const r = await fetch(`/api/support/tickets/${id}/close`,{method:'POST'});
+  if(r.ok){ toast('✅ Ticket encerrado!','ok'); loadAdminTicket(); loadTickets('open'); }
+}
+
+async function sendSupportReply(){
+  const input = document.getElementById('modalReply');
+  const text = input.value.trim(); if(!text) return;
+  input.value='';
+  const r = await fetch(`/api/support/tickets/${currentAdminTicket}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+  if(r.ok) loadAdminTicket();
+  else toast('Erro ao enviar.','err');
+}
+
+// Phones
+let phonesList = [];
+async function loadPhones(){
+  try{
+    const r = await fetch('/api/admin/support-phones');
+    phonesList = await r.json();
+    renderPhonesList();
+  }catch(e){}
+}
+
+function renderPhonesList(){
+  const el = document.getElementById('phonesList');
+  if(!phonesList.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">Nenhum número cadastrado.</div>'; return; }
+  el.innerHTML = phonesList.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+      <span style="font-size:18px">💬</span>
+      <span style="flex:1;font-size:13px"><strong>${escHtml(p.label)}</strong> &nbsp;<span style="color:var(--muted)">${p.number}</span></span>
+      <button onclick="removePhone(${i})" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:16px">✕</button>
+    </div>`).join('');
+}
+
+async function addPhone(){
+  const label = document.getElementById('newPhoneLabel').value.trim();
+  const number = document.getElementById('newPhoneNum').value.trim();
+  if(!number) return toast('Informe o número.','err');
+  phonesList.push({label:label||'Suporte',number});
+  document.getElementById('newPhoneLabel').value='';
+  document.getElementById('newPhoneNum').value='';
+  await savePhones();
+}
+
+function removePhone(i){ phonesList.splice(i,1); renderPhonesList(); savePhones(); }
+
+async function savePhones(){
+  const r = await fetch('/api/admin/support-phones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phones:phonesList})});
+  if(r.ok){ renderPhonesList(); toast('✅ Números salvos!','ok'); }
+}
+
+async function loadSupportStats(){
+  try{
+    const r = await fetch('/api/support/stats');
+    const d = await r.json();
+    document.getElementById('supportStats').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:var(--accent)">${d.open}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Abertos</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:var(--muted)">${d.closed}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Encerrados</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#f5a623">${d.avgRating||'—'}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">⭐ Média</div>
+        </div>
+      </div>`;
+  }catch(e){}
+}
+
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 async function init() {
@@ -1169,7 +1383,7 @@ async function init() {
     });
     const lbl = document.getElementById('mbnLabelConfig');
     if(lbl) lbl.style.display='block';
-    ['navLabelConfig','navApikeys','navBackup','navPersonality','navTheme','navBranding','navAnnounce','navSecurity','navErrorlog','navBlacklist','navChangelog','navSharedRooms','navDatabase'].forEach(id=>{
+    ['navLabelConfig','navApikeys','navBackup','navPersonality','navTheme','navBranding','navAnnounce','navSecurity','navErrorlog','navBlacklist','navChangelog','navSupport','navSharedRooms','navDatabase'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.style.display='';
     });
     loadConfig();
@@ -1178,6 +1392,11 @@ async function init() {
     if(el) el.style.display='flex';
     const el2 = document.getElementById('navSharedRooms');
     if(el2) el2.style.display='';
+    // subdono and admin can see support tab
+    if(['subdono','admin'].includes(me.role)){
+      const ns = document.getElementById('navSupport');
+      if(ns) ns.style.display='';
+    }
   }
   loadStats();
   loadUsers();
@@ -1524,13 +1743,17 @@ async function loadUsers(){
   tbody.innerHTML=users.map(u=>{
     const now=Math.floor(Date.now()/1000),ago=u.last_seen?now-u.last_seen:null;
     const onlineStr=!ago?'<span style="color:var(--muted);font-size:11px">nunca</span>':ago<300?'<span style="color:#19c37d;font-size:11px">● online</span>':ago<3600?`<span style="color:#f5a623;font-size:11px">há ${Math.floor(ago/60)}min</span>`:ago<86400?`<span style="color:var(--muted);font-size:11px">há ${Math.floor(ago/3600)}h</span>`:`<span style="color:var(--muted);font-size:11px">${new Date(u.last_seen*1000).toLocaleDateString('pt-BR')}</span>`;
-    const roleLabel=u.role==='creator'?'👑 Criador':u.role==='admin'?'🛡 Admin':u.role==='vip'?'⭐ VIP':'👤 Usuário';
+    const roleLabel=u.role==='creator'?'👑 Criador':u.role==='subdono'?'🥈 Sub-dono':u.role==='admin'?'🛡 Admin':u.role==='vip'?'⭐ VIP':'👤 Usuário';
     const keysHtml=(u.hasGroqKey||u.hasGeminiKey)?`${u.hasGroqKey?'<span class="kb groq">Groq</span>':''}${u.hasGeminiKey?'<span class="kb gemini">Gemini</span>':''}`:'<span class="kb none">Global</span>';
     const stat=byUser.find(s=>s.email===u.email);
     const acts=[];
     if(me.role==='creator'&&u.role!=='creator'){
-      if(u.role==='user') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
-      if(u.role==='user') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'vip')" style="color:#f5a623;border-color:rgba(245,166,35,.3)">⭐ VIP</button>`);
+      if(u.role==='user'){
+        acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'admin')">→ Admin</button>`);
+        acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'subdono')" style="color:#a78bfa;border-color:rgba(167,139,250,.3)">🥈 Sub-dono</button>`);
+        acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'vip')" style="color:#f5a623;border-color:rgba(245,166,35,.3)">⭐ VIP</button>`);
+      }
+      if(u.role==='subdono') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
       if(u.role==='vip') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
       if(u.role==='admin') acts.push(`<button class="btn-role" onclick="changeRole(${u.id},'user')">→ User</button>`);
       acts.push(`<button class="btn-role" onclick="resetPwd(${u.id},'${u.email}')">🔑</button>`);

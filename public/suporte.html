@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexia — Suporte</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f0f;--card:#141414;--surface:#1a1a1a;--border:#252525;--text:#ececec;--muted:#8e8ea0;--accent:#19c37d;--blue:#4f8ef7;--purple:#c084fc;--orange:#fb923c}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+header img{width:32px;height:32px;border-radius:8px}
+header h1{font-size:16px;font-weight:700}
+.back-btn{margin-left:auto;background:none;border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:6px}
+.back-btn:hover{color:var(--text)}
+.container{max-width:680px;margin:0 auto;padding:24px 16px}
+
+/* SCREEN SYSTEM */
+.screen{display:none}.screen.active{display:block}
+
+/* HOME */
+.hero{text-align:center;padding:32px 0 24px}
+.hero h2{font-size:26px;font-weight:700;margin-bottom:8px}
+.hero p{color:var(--muted);font-size:14px}
+.channel-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0}
+.channel-card{background:var(--card);border:2px solid var(--border);border-radius:16px;padding:24px 20px;cursor:pointer;text-align:center;transition:all .2s}
+.channel-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.channel-card.selected{border-color:var(--accent);background:rgba(25,195,125,.06)}
+.channel-icon{font-size:36px;margin-bottom:10px}
+.channel-title{font-size:15px;font-weight:600;margin-bottom:4px}
+.channel-desc{font-size:12px;color:var(--muted)}
+.my-tickets-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;width:100%;font-family:'Inter',sans-serif;font-size:13px;color:var(--muted);cursor:pointer;margin-top:8px}
+.my-tickets-btn:hover{color:var(--text)}
+
+/* FORM */
+.form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px}
+.form-title{font-size:18px;font-weight:700;margin-bottom:4px}
+.form-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:border-color .15s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent)}
+.field textarea{resize:vertical;min-height:90px}
+.btn-primary{width:100%;background:var(--accent);border:none;border-radius:10px;padding:13px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s}
+.btn-primary:hover{filter:brightness(1.1)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+
+/* WA PHONES */
+.wa-list{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.wa-item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.wa-item:hover{border-color:#25d366}
+.wa-icon{width:40px;height:40px;border-radius:50%;background:rgba(37,211,102,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.wa-info{flex:1}
+.wa-label{font-size:14px;font-weight:600}
+.wa-number{font-size:12px;color:var(--muted)}
+.wa-arrow{color:var(--muted);font-size:18px}
+
+/* TICKET VIEW */
+.ticket-header{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px}
+.ticket-subject{font-size:17px;font-weight:700;margin-bottom:6px}
+.ticket-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.status-badge{border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600}
+.status-open{background:rgba(25,195,125,.15);color:var(--accent)}
+.status-closed{background:rgba(142,142,160,.15);color:var(--muted)}
+.assigned-badge{font-size:12px;color:var(--muted)}
+
+.messages-area{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;max-height:50vh;overflow-y:auto;padding-right:4px}
+.msg-bubble{max-width:80%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.5}
+.msg-user{align-self:flex-end;background:rgba(25,195,125,.15);border:1px solid rgba(25,195,125,.2);color:var(--text)}
+.msg-support{align-self:flex-start;background:var(--surface);border:1px solid var(--border)}
+.msg-meta{font-size:10px;color:var(--muted);margin-top:4px}
+.msg-input-row{display:flex;gap:8px}
+.msg-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none}
+.msg-input:focus{border-color:var(--accent)}
+.send-btn{background:var(--accent);border:none;border-radius:10px;padding:10px 18px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+
+/* RATING */
+.rating-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;margin-bottom:16px}
+.stars-row{display:flex;justify-content:center;gap:8px;margin:14px 0}
+.star{font-size:32px;cursor:pointer;transition:transform .15s;opacity:.3}
+.star:hover,.star.active{opacity:1;transform:scale(1.15)}
+
+/* MY TICKETS */
+.ticket-list{display:flex;flex-direction:column;gap:10px}
+.ticket-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.ticket-item:hover{border-color:var(--accent)}
+.ticket-item-subject{font-size:14px;font-weight:600;margin-bottom:4px}
+.ticket-item-meta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.rating-stars{color:#f5a623}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-size:13px;display:none;z-index:999}
+.toast.show{display:block}.toast.ok{color:var(--accent)}.toast.err{color:#fca5a5}
+</style>
+</head>
+<body>
+<header>
+  <img src="/logo.png" alt="Nexia">
+  <h1>Suporte Nexia</h1>
+  <a href="/chat.html" class="back-btn">← Voltar ao chat</a>
+</header>
+
+<!-- HOME -->
+<div class="screen active" id="screenHome">
+  <div class="container">
+    <div class="hero">
+      <h2>Como podemos ajudar?</h2>
+      <p>Escolha como prefere receber suporte</p>
+    </div>
+    <div class="channel-grid">
+      <div class="channel-card" onclick="selectChannel('app')">
+        <div class="channel-icon">🤖</div>
+        <div class="channel-title">Chat no App</div>
+        <div class="channel-desc">Atendimento por nossa equipe dentro do Nexia</div>
+      </div>
+      <div class="channel-card" id="waCard" onclick="selectChannel('whatsapp')">
+        <div class="channel-icon">💬</div>
+        <div class="channel-title">WhatsApp</div>
+        <div class="channel-desc">Falar diretamente pelo WhatsApp</div>
+      </div>
+    </div>
+    <button class="my-tickets-btn" onclick="showMyTickets()">📋 Meus tickets de suporte</button>
+  </div>
+</div>
+
+<!-- FORM APP -->
+<div class="screen" id="screenForm">
+  <div class="container">
+    <div class="form-card">
+      <div class="form-title">🤖 Abrir ticket de suporte</div>
+      <div class="form-sub">Descreva seu problema e nossa equipe responderá em breve.</div>
+      <div class="field">
+        <label>Assunto</label>
+        <input type="text" id="ticketSubject" placeholder="Ex: Problema ao enviar mensagem...">
+      </div>
+      <div class="field">
+        <label>Descreva o problema</label>
+        <textarea id="ticketMsg" placeholder="Explique com detalhes o que aconteceu..."></textarea>
+      </div>
+      <button class="btn-primary" onclick="submitTicket()">Enviar ticket →</button>
+      <button onclick="showScreen('screenHome')" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;padding:8px">← Voltar</button>
+    </div>
+  </div>
+</div>
+
+<!-- WA CHOICE -->
+<div class="screen" id="screenWa">
+  <div class="container">
+    <div class="form-card">
+      <div class="form-title">💬 Suporte via WhatsApp</div>
+      <div class="form-sub">Escolha um atendente disponível</div>
+      <div class="wa-list" id="waList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      <button onclick="showScreen('screenHome')" style="width:100%;background:none;border:none;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;padding:8px">← Voltar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TICKET VIEW -->
+<div class="screen" id="screenTicket">
+  <div class="container">
+    <div class="ticket-header" id="ticketHeader"></div>
+    <div class="messages-area" id="messagesArea"></div>
+    <div id="ratingArea"></div>
+    <div class="msg-input-row" id="msgInputRow">
+      <input class="msg-input" id="msgInput" placeholder="Escreva sua mensagem..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}">
+      <button class="send-btn" onclick="sendMsg()">Enviar</button>
+    </div>
+    <button onclick="showMyTickets()" style="width:100%;margin-top:10px;background:none;border:none;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;padding:8px">← Meus tickets</button>
+  </div>
+</div>
+
+<!-- MY TICKETS -->
+<div class="screen" id="screenMyTickets">
+  <div class="container">
+    <h2 style="margin-bottom:16px">📋 Meus Tickets</h2>
+    <div class="ticket-list" id="myTicketsList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+    <button onclick="showScreen('screenHome')" style="width:100%;margin-top:16px;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;padding:10px">← Voltar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let me = null, currentTicketId = null, waPhones = [], pollInterval = null;
+
+async function init(){
+  try{
+    const r = await fetch('/api/me'); if(!r.ok){ window.location.href='/'; return; }
+    me = await r.json();
+    // Load WA phones
+    const wp = await fetch('/api/support/phones-public');
+    if(wp.ok) waPhones = await wp.json();
+    if(!waPhones.length) document.getElementById('waCard').style.opacity='.4';
+    // Check URL for ticket
+    const params = new URLSearchParams(location.search);
+    if(params.get('ticket')) openTicket(parseInt(params.get('ticket')));
+  }catch(e){ window.location.href='/'; }
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(pollInterval){ clearInterval(pollInterval); pollInterval=null; }
+}
+
+function selectChannel(ch){
+  if(ch==='app') showScreen('screenForm');
+  else {
+    if(!waPhones.length){ toast('Nenhum número de WhatsApp configurado.','err'); return; }
+    renderWaList();
+    showScreen('screenWa');
+  }
+}
+
+function renderWaList(){
+  const el = document.getElementById('waList');
+  el.innerHTML = waPhones.map(p=>`
+    <div class="wa-item" onclick="openWa('${p.number}')">
+      <div class="wa-icon">💬</div>
+      <div class="wa-info"><div class="wa-label">${p.label||'Suporte'}</div><div class="wa-number">${p.number}</div></div>
+      <div class="wa-arrow">→</div>
+    </div>`).join('');
+}
+
+function openWa(number){
+  const msg = encodeURIComponent('Olá! Preciso de ajuda com o Nexia.');
+  window.open(`https://wa.me/${number}?text=${msg}`,'_blank');
+}
+
+async function submitTicket(){
+  const subject = document.getElementById('ticketSubject').value.trim();
+  const msg = document.getElementById('ticketMsg').value.trim();
+  if(!subject) return toast('Preencha o assunto.','err');
+  const btn = document.querySelector('#screenForm .btn-primary');
+  btn.disabled=true; btn.textContent='Enviando...';
+  try{
+    const r = await fetch('/api/support/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject,channel:'app',firstMessage:msg})});
+    if(!r.ok) throw new Error();
+    const t = await r.json();
+    toast('✅ Ticket aberto!','ok');
+    openTicket(t.id);
+  }catch(e){ toast('Erro ao abrir ticket.','err'); }
+  finally{ btn.disabled=false; btn.textContent='Enviar ticket →'; }
+}
+
+async function openTicket(id){
+  currentTicketId = id;
+  showScreen('screenTicket');
+  await loadTicket();
+  pollInterval = setInterval(loadTicket, 4000);
+}
+
+async function loadTicket(){
+  try{
+    const r = await fetch(`/api/support/tickets/${currentTicketId}`);
+    if(!r.ok) return;
+    const t = await r.json();
+    renderTicketHeader(t);
+    renderMessages(t);
+    renderRating(t);
+    document.getElementById('msgInputRow').style.display = t.status==='closed' ? 'none' : 'flex';
+  }catch(e){}
+}
+
+function renderTicketHeader(t){
+  const el = document.getElementById('ticketHeader');
+  el.innerHTML=`
+    <div class="ticket-subject">${escHtml(t.subject)}</div>
+    <div class="ticket-meta">
+      <span class="status-badge status-${t.status}">${t.status==='open'?'🟢 Aberto':'⚫ Encerrado'}</span>
+      ${t.assigned_email?`<span class="assigned-badge">👤 ${escHtml(t.assigned_email)}</span>`:'<span class="assigned-badge">Aguardando atendente...</span>'}
+      <span style="font-size:11px;color:var(--muted);margin-left:auto">#${t.id}</span>
+    </div>`;
+}
+
+function renderMessages(t){
+  const msgs = Array.isArray(t.messages) ? t.messages : JSON.parse(t.messages||'[]');
+  const el = document.getElementById('messagesArea');
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  el.innerHTML = msgs.length ? msgs.map(m=>`
+    <div class="msg-bubble msg-${m.role}">
+      ${escHtml(m.text)}
+      <div class="msg-meta">${m.role==='support'?'👤 Suporte':'Você'} · ${new Date(m.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Aguardando atendente...</div>';
+  if(atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function renderRating(t){
+  const el = document.getElementById('ratingArea');
+  if(t.status !== 'closed'){ el.innerHTML=''; return; }
+  if(t.rating){
+    el.innerHTML=`<div class="rating-card"><div style="font-size:14px;font-weight:600;margin-bottom:6px">✅ Avaliação enviada</div><div class="rating-stars">${'⭐'.repeat(t.rating)}</div>${t.rating_comment?`<div style="font-size:13px;color:var(--muted);margin-top:8px">"${escHtml(t.rating_comment)}"</div>`:''}</div>`;
+    return;
+  }
+  el.innerHTML=`
+    <div class="rating-card">
+      <div style="font-size:15px;font-weight:600">Como foi o atendimento?</div>
+      <div style="font-size:13px;color:var(--muted)">Avalie o suporte que você recebeu</div>
+      <div class="stars-row" id="starsRow">
+        ${[1,2,3,4,5].map(i=>`<span class="star" data-v="${i}" onclick="selectStar(${i})">⭐</span>`).join('')}
+      </div>
+      <input type="text" id="ratingComment" placeholder="Comentário opcional..." style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;margin-bottom:10px">
+      <button onclick="submitRating(${t.id})" style="background:var(--accent);border:none;border-radius:8px;padding:9px 20px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Enviar avaliação ⭐</button>
+    </div>`;
+}
+
+let selectedStar = 0;
+function selectStar(v){
+  selectedStar = v;
+  document.querySelectorAll('.star').forEach(s=>s.classList.toggle('active', parseInt(s.dataset.v)<=v));
+}
+
+async function submitRating(id){
+  if(!selectedStar) return toast('Selecione uma nota.','err');
+  const comment = document.getElementById('ratingComment')?.value||'';
+  const r = await fetch(`/api/support/tickets/${id}/rate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rating:selectedStar,comment})});
+  if(r.ok){ toast('✅ Obrigado pela avaliação!','ok'); loadTicket(); }
+}
+
+async function sendMsg(){
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim(); if(!text) return;
+  input.value='';
+  const r = await fetch(`/api/support/tickets/${currentTicketId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+  if(r.ok) loadTicket();
+  else toast('Erro ao enviar.','err');
+}
+
+async function showMyTickets(){
+  showScreen('screenMyTickets');
+  const r = await fetch('/api/support/tickets/mine');
+  const tickets = await r.json();
+  const el = document.getElementById('myTicketsList');
+  if(!tickets.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Você ainda não abriu nenhum ticket.</div>'; return; }
+  el.innerHTML = tickets.map(t=>`
+    <div class="ticket-item" onclick="openTicket(${t.id})">
+      <div class="ticket-item-subject">${escHtml(t.subject)}</div>
+      <div class="ticket-item-meta">
+        <span class="status-badge status-${t.status}" style="font-size:10px">${t.status==='open'?'🟢 Aberto':'⚫ Encerrado'}</span>
+        <span>${new Date(t.created_at*1000).toLocaleDateString('pt-BR')}</span>
+        ${t.rating?`<span class="rating-stars">${'⭐'.repeat(t.rating)}</span>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function toast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast show ${type}`;setTimeout(()=>t.classList.remove('show'),3000);}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+init();
+</script>
+</body>
+</html>

@@ -248,11 +248,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
       <button class="sidebar-btn" onclick="summarizeChat()" id="summarizeBtn" style="display:none;color:#f5a623">📋 &nbsp;Resumir conversa</button>
       <button class="sidebar-btn" onclick="openShare()" style="color:#19c37d">📤 &nbsp;Compartilhar Nexia</button>
       <button class="sidebar-btn" onclick="openSharedChat()" style="color:#f472b6">💞 &nbsp;Chat Compartilhado</button>
-      <button class="sidebar-btn" id="supportSidebarBtn" style="display:none;color:#25d366" onclick="toggleSupportMenu()">💬 &nbsp;Suporte</button>
-      <div id="supportOptions" style="display:none;flex-direction:column;gap:4px;padding:0 4px">
-        <a id="supportOptChat" href="#" onclick="openSupportChat();return false;" class="sidebar-btn" style="color:#c084fc;text-decoration:none">🤖 &nbsp;Chat de Suporte</a>
-        <a id="supportOptWa" href="#" onclick="openSupportWa();return false;" class="sidebar-btn" style="color:#25d366;text-decoration:none">💬 &nbsp;WhatsApp</a>
-      </div>
+      <button class="sidebar-btn" id="supportSidebarBtn" style="color:#25d366" onclick="window.location.href='/suporte.html'">💬 &nbsp;Suporte</button>
       <button class="sidebar-btn danger" onclick="doLogout()">← &nbsp;Sair</button>
     </div>
   </aside>
