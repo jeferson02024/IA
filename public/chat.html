@@ -1063,7 +1063,7 @@ function shareWhatsApp(){
 }
 
 // ===== SHARED CHAT ROOM =====
-let scRoomId = null, scPollInterval = null, scLastTs = 0, scAllMessages = [];
+let scRoomId = null, scPollInterval = null, scLastTs = 0, scAllMessages = [], scSeenIds = new Set();
 let scProvider = 'groq', scModel = 'llama-3.3-70b-versatile';
 
 const scModels = {
@@ -1077,19 +1077,32 @@ function scSetProvider(p){
   scProvider = p;
   const defaults = { groq:'llama-3.3-70b-versatile', gemini:'gemini-2.0-flash', mistral:'mistral-large-latest', openrouter:'openrouter/auto' };
   scModel = defaults[p];
-  // Update buttons
+  const activeColors = {
+    groq:       { bg:'rgba(25,195,125,.15)',  border:'rgba(25,195,125,.3)',   color:'#19c37d' },
+    gemini:     { bg:'rgba(79,142,247,.15)',  border:'rgba(79,142,247,.3)',   color:'#4f8ef7' },
+    mistral:    { bg:'rgba(255,112,0,.15)',   border:'rgba(255,112,0,.3)',    color:'#ff7000' },
+    openrouter: { bg:'rgba(124,58,237,.15)', border:'rgba(124,58,237,.3)',   color:'#c084fc' }
+  };
   ['groq','gemini','mistral','openrouter'].forEach(name => {
     const btn = document.getElementById('scBtn'+name.charAt(0).toUpperCase()+name.slice(1));
     if(!btn) return;
-    const colors = {groq:'rgba(25,195,125,.15),rgba(25,195,125,.3),#19c37d', gemini:'rgba(79,142,247,.15),rgba(79,142,247,.3),#4f8ef7', mistral:'rgba(255,112,0,.15),rgba(255,112,0,.3),#ff7000', openrouter:'rgba(124,58,237,.15),rgba(124,58,237,.3),#c084fc'};
-    const [bg,border,color] = colors[name].split(',');
-    if(name===p){ btn.style.background=bg; btn.style.borderColor=border; btn.style.color=color; }
-    else { btn.style.background='var(--surface)'; btn.style.borderColor='var(--border)'; btn.style.color='var(--muted)'; }
+    if(name === p){
+      btn.style.background   = activeColors[p].bg;
+      btn.style.borderColor  = activeColors[p].border;
+      btn.style.color        = activeColors[p].color;
+      btn.style.fontWeight   = '700';
+    } else {
+      btn.style.background   = 'var(--surface)';
+      btn.style.borderColor  = 'var(--border)';
+      btn.style.color        = 'var(--muted)';
+      btn.style.fontWeight   = '400';
+    }
   });
-  // Update model select
   const sel = document.getElementById('scModelSelect');
-  sel.innerHTML = scModels[p].map(m=>`<option value="${m}">${m.replace('openrouter/','').replace(':free',' (free)')}</option>`).join('');
-  sel.value = scModel;
+  if(sel){
+    sel.innerHTML = scModels[p].map(m=>`<option value="${m}">${m.replace('openrouter/','Nexia/').replace(':free',' (free)')}</option>`).join('');
+    sel.value = scModel;
+  }
 }
 
 function openSharedChat(){
@@ -1126,7 +1139,7 @@ async function joinSharedRoom(){
 }
 
 function enterRoom(code){
-  scLastTs = 0; scAllMessages = [];
+  scLastTs = 0; scAllMessages = []; scSeenIds = new Set();
   document.getElementById('scRoomCodeDisplay').textContent = code;
   document.getElementById('scMessages').innerHTML = '';
   document.getElementById('sharedChatRoom').style.display = 'flex';
@@ -1153,15 +1166,17 @@ async function loadScMessages(initial){
 
     if(initial && d.allMessages){
       scAllMessages = d.allMessages;
+      scSeenIds = new Set(d.allMessages.map(m => m.id));
       renderScMessages(scAllMessages);
       if(d.allMessages.length) scLastTs = d.allMessages[d.allMessages.length-1].ts;
       return;
     }
 
     if(d.messages && d.messages.length){
-      d.messages.forEach(m => { scAllMessages.push(m); appendScMessage(m); });
-      scLastTs = d.messages[d.messages.length-1].ts;
-      document.getElementById('scTyping').style.display = 'none';
+      const newMsgs = d.messages.filter(m => !scSeenIds.has(m.id));
+      newMsgs.forEach(m => { scSeenIds.add(m.id); scAllMessages.push(m); appendScMessage(m); });
+      if(d.messages.length) scLastTs = d.messages[d.messages.length-1].ts;
+      if(newMsgs.some(m => m.role==='assistant')) document.getElementById('scTyping').style.display = 'none';
     }
   }catch(e){}
 }
@@ -1219,11 +1234,18 @@ async function sendSharedMsg(){
   try{
     const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, provider: scProvider, model: scModel})});
     const d = await r.json();
-    if(!r.ok){ toast(d.error||'Erro.','err'); return; }
-    if(d.msg){ scAllMessages.push(d.msg); appendScMessage(d.msg); scLastTs = d.msg.ts; }
-    setTimeout(()=>loadScMessages(false), 2000);
-    setTimeout(()=>loadScMessages(false), 4000);
-    setTimeout(()=>{ loadScMessages(false); document.getElementById('scTyping').style.display='none'; }, 6000);
+    if(!r.ok){ toast(d.error||'Erro.','err'); document.getElementById('scTyping').style.display='none'; return; }
+    // Add user msg immediately via dedup-safe method
+    if(d.msg && !scSeenIds.has(d.msg.id)){
+      scSeenIds.add(d.msg.id);
+      scAllMessages.push(d.msg);
+      appendScMessage(d.msg);
+      scLastTs = d.msg.ts;
+    }
+    // Poll for AI response
+    setTimeout(()=>loadScMessages(false), 2500);
+    setTimeout(()=>loadScMessages(false), 5000);
+    setTimeout(()=>{ loadScMessages(false); document.getElementById('scTyping').style.display='none'; }, 8000);
   }catch(e){ toast('Erro ao enviar.','err'); document.getElementById('scTyping').style.display='none'; }
 }
 
