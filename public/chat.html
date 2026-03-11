@@ -182,6 +182,8 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
       <div class="user-info" id="userInfo">Carregando...</div>
       <button class="sidebar-btn admin-btn" id="adminBtn" style="display:none" onclick="window.location.href='/admin.html'">🛡 &nbsp;Painel Admin</button>
       <button class="sidebar-btn" onclick="openSettings()">⚙️ &nbsp;Configurações</button>
+      <button class="sidebar-btn" onclick="openAppSettings()" style="color:#a855f7">🎨 &nbsp;Personalizar App</button>
+      <button class="sidebar-btn" onclick="openShare()" style="color:#19c37d">📤 &nbsp;Compartilhar</button>
       <button class="sidebar-btn danger" onclick="doLogout()">← &nbsp;Sair</button>
     </div>
   </aside>
@@ -261,6 +263,53 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 
 <div id="sidebarBackdrop" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.5)"></div>
 <div class="toast-msg" id="toast"></div>
+
+<!-- Share Modal -->
+<div class="overlay" id="shareOverlay" onclick="closeOut(event,'shareOverlay')">
+  <div class="modal">
+    <h3>📤 Compartilhar Nexia</h3>
+    <p>Compartilhe o link do app com seus amigos.</p>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <span id="shareUrl" style="flex:1;font-size:12px;color:var(--muted);word-break:break-all"></span>
+      <button onclick="copyShareLink()" style="background:var(--accent);border:none;border-radius:6px;padding:6px 12px;color:#000;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0">Copiar</button>
+    </div>
+    <div style="text-align:center;margin-bottom:12px">
+      <canvas id="qrCanvas" style="border-radius:10px;background:#fff;padding:10px"></canvas>
+      <p style="font-size:11px;color:var(--muted);margin-top:8px">QR Code permanente</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="downloadQR()" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">⬇️ Salvar QR</button>
+      <button onclick="shareWhatsApp()" style="flex:1;background:#25d366;border:none;border-radius:8px;padding:9px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">WhatsApp</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('shareOverlay').classList.remove('show')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- App Settings Modal -->
+<div class="overlay" id="appSettingsOverlay" onclick="closeOut(event,'appSettingsOverlay')">
+  <div class="modal">
+    <h3>🎨 Personalizar App</h3>
+    <p>Mude o nome e o logo do app.</p>
+    <div class="modal-field">
+      <label>Nome do App</label>
+      <input type="text" id="appNameInput" placeholder="Ex: Nexia, MeuBot, etc..."/>
+    </div>
+    <div class="modal-field">
+      <label>URL do Logo (imagem PNG/JPG)</label>
+      <input type="text" id="appLogoInput" placeholder="https://..."/>
+    </div>
+    <div style="text-align:center;margin:12px 0">
+      <img id="logoPreview" src="/logo.png" style="width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid var(--border)">
+      <p style="font-size:11px;color:var(--muted);margin-top:6px">Preview</p>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('appSettingsOverlay').classList.remove('show')">Cancelar</button>
+      <button class="btn-save" onclick="saveAppSettings()">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <script>
   // Só redireciona pro Chrome se vier de app externo (Instagram, WhatsApp, etc.)
@@ -885,6 +934,104 @@ async function buildAndDownloadZip(blocks){
 }
 
 init();
+
+// ===== APP SETTINGS =====
+function loadAppSettings(){
+  const name = localStorage.getItem('appName') || 'Nexia';
+  const logo = localStorage.getItem('appLogo') || '/logo.png';
+  applyAppSettings(name, logo);
+}
+
+function applyAppSettings(name, logo){
+  // Update all name occurrences
+  document.querySelectorAll('.sidebar-title, .mob-header span').forEach(el => {
+    if(el.classList.contains('sidebar-title') || el.closest('.mob-header')) el.textContent = name;
+  });
+  document.title = name;
+  // Update all logos
+  document.querySelectorAll('.sidebar-logo').forEach(el => el.src = logo);
+}
+
+function openAppSettings(){
+  const name = localStorage.getItem('appName') || 'Nexia';
+  const logo = localStorage.getItem('appLogo') || '/logo.png';
+  document.getElementById('appNameInput').value = name;
+  document.getElementById('appLogoInput').value = logo === '/logo.png' ? '' : logo;
+  document.getElementById('logoPreview').src = logo;
+  document.getElementById('appSettingsOverlay').classList.add('show');
+}
+
+document.getElementById('appLogoInput')?.addEventListener('input', function(){
+  const v = this.value.trim();
+  if(v) document.getElementById('logoPreview').src = v;
+});
+
+function saveAppSettings(){
+  const name = document.getElementById('appNameInput').value.trim() || 'Nexia';
+  const logoInput = document.getElementById('appLogoInput').value.trim();
+  const logo = logoInput || '/logo.png';
+  localStorage.setItem('appName', name);
+  localStorage.setItem('appLogo', logo);
+  applyAppSettings(name, logo);
+  document.getElementById('appSettingsOverlay').classList.remove('show');
+  toast('App personalizado com sucesso!', 'ok');
+}
+
+// ===== SHARE & QR CODE =====
+function openShare(){
+  const url = window.location.origin;
+  document.getElementById('shareUrl').textContent = url;
+  document.getElementById('shareOverlay').classList.add('show');
+  generateQR(url);
+}
+
+function generateQR(text){
+  const canvas = document.getElementById('qrCanvas');
+  const size = 200;
+  canvas.width = size;
+  canvas.height = size;
+  // Simple QR using Google Charts API image
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,size,size);
+    ctx.drawImage(img, 0, 0, size, size);
+  };
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000`;
+}
+
+function copyShareLink(){
+  const url = window.location.origin;
+  navigator.clipboard.writeText(url).then(()=>toast('Link copiado!','ok')).catch(()=>{
+    const el = document.createElement('textarea');
+    el.value = url;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    toast('Link copiado!','ok');
+  });
+}
+
+function downloadQR(){
+  const canvas = document.getElementById('qrCanvas');
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'nexia-qrcode.png';
+  a.click();
+}
+
+function shareWhatsApp(){
+  const url = window.location.origin;
+  const name = localStorage.getItem('appName') || 'Nexia';
+  const msg = `Olá! Acesse o ${name} aqui: ${url}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// Load app settings on start
+loadAppSettings();
 </script>
 </body>
 </html>
