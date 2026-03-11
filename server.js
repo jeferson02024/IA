@@ -795,55 +795,120 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
 });
 
-// ===== SHARED ROOMS =====
-const sharedRooms = new Map(); // code -> {participants:[], messages:[], createdAt}
+// ===== SHARED ROOMS (até 8 pessoas, com IA) =====
+const sharedRooms = new Map();
+// room: { code, createdBy, participants:[{email,joinedAt}], messages:[{id,email,role,content,ts}], createdAt }
 
 function genCode(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
 
+// Criar sala
 app.post('/api/shared-room', auth, async (req,res) => {
   try{
     const { action, code } = req.body;
     const email = req.user.email;
     if(action === 'create'){
       const newCode = genCode();
-      sharedRooms.set(newCode, { participants:[email], messages:[], createdAt: Date.now() });
+      sharedRooms.set(newCode, {
+        code: newCode,
+        createdBy: email,
+        participants: [{ email, joinedAt: Date.now() }],
+        messages: [],
+        createdAt: Date.now()
+      });
       return res.json({ code: newCode });
     }
     if(action === 'join'){
       const room = sharedRooms.get(code);
       if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
-      if(room.participants.length >= 2 && !room.participants.includes(email))
-        return res.status(400).json({ error: 'Sala cheia (máx 2 pessoas).' });
-      if(!room.participants.includes(email)) room.participants.push(email);
-      return res.json({ ok: true });
+      if(room.participants.length >= 8 && !room.participants.find(p=>p.email===email))
+        return res.status(400).json({ error: 'Sala cheia (máx 8 pessoas).' });
+      if(!room.participants.find(p=>p.email===email))
+        room.participants.push({ email, joinedAt: Date.now() });
+      return res.json({ ok: true, code });
     }
     res.status(400).json({ error: 'Ação inválida.' });
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
+// Buscar mensagens (polling)
 app.get('/api/shared-room/:code/messages', auth, async (req,res) => {
   try{
     const room = sharedRooms.get(req.params.code);
     if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
     const email = req.user.email;
-    if(!room.participants.includes(email)) room.participants.push(email);
-    res.json({ messages: room.messages, participants: room.participants.length });
+    if(!room.participants.find(p=>p.email===email))
+      room.participants.push({ email, joinedAt: Date.now() });
+    const since = parseInt(req.query.since||'0');
+    const newMsgs = room.messages.filter(m=>m.ts > since);
+    res.json({
+      messages: newMsgs,
+      allMessages: room.messages.slice(-100),
+      participants: room.participants,
+      code: room.code,
+      createdBy: room.createdBy
+    });
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
+// Enviar mensagem + chamar IA
 app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
   try{
     const room = sharedRooms.get(req.params.code);
     if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
-    const { text } = req.body;
+    const { text, provider, model } = req.body;
     if(!text) return res.status(400).json({ error: 'Texto vazio.' });
-    room.messages.push({ email: req.user.email, text, ts: Date.now() });
-    // Keep last 200 messages
-    if(room.messages.length > 200) room.messages = room.messages.slice(-200);
-    res.json({ ok: true });
+
+    // Add user message
+    const userMsg = { id: Date.now(), email: req.user.email, role: 'user', content: text, ts: Date.now() };
+    room.messages.push(userMsg);
+    res.json({ ok: true, msg: userMsg });
+
+    // Call AI in background
+    try {
+      const cfg = await q('SELECT value FROM config WHERE key=$1', ['groq_key']);
+      const apiKey = cfg.rows[0]?.value;
+      if(!apiKey) return;
+
+      const history = room.messages.slice(-20)
+        .filter(m=>m.role==='user'||m.role==='assistant')
+        .map(m=>({ role: m.role==='assistant'?'assistant':'user', content: typeof m.content==='string'?m.content:JSON.stringify(m.content) }));
+
+      const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method:'POST',
+        headers:{ 'Authorization':`Bearer ${apiKey}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          model: model || 'llama-3.3-70b-versatile',
+          messages: [
+            { role:'system', content:`Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${room.participants.length} pessoas. Responda sempre em português. Se o usuário pedir para criar/gerar imagem, responda normalmente que está gerando e use: ##IMG## descrição em inglês ##ENDIMG##` },
+            ...history
+          ],
+          max_tokens: 1024
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if(!aiRes.ok) return;
+      const aiData = await aiRes.json();
+      const aiText = aiData.choices?.[0]?.message?.content || '';
+      if(!aiText) return;
+
+      const aiMsg = { id: Date.now()+1, email: 'Nexia', role: 'assistant', content: aiText, ts: Date.now() };
+      room.messages.push(aiMsg);
+      if(room.messages.length > 500) room.messages = room.messages.slice(-500);
+    } catch(e){ console.error('AI error in shared room:', e.message); }
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
+// Sair da sala
+app.delete('/api/shared-room/:code/leave', auth, (req,res) => {
+  const room = sharedRooms.get(req.params.code);
+  if(!room) return res.json({ ok: true });
+  room.participants = room.participants.filter(p=>p.email!==req.user.email);
+  if(room.participants.length === 0) sharedRooms.delete(req.params.code);
+  res.json({ ok: true });
+});
+
+// Admin - listar salas
 app.get('/api/admin/shared-rooms', auth, role('creator','admin'), (req,res) => {
   const now = Date.now();
   const rooms = [];
@@ -854,18 +919,28 @@ app.get('/api/admin/shared-rooms', auth, role('creator','admin'), (req,res) => {
       : `há ${Math.floor(ageMs/3600000)}h`;
     rooms.push({
       code,
+      createdBy: room.createdBy,
       participants: room.participants.length,
-      participantList: room.participants,
+      participantList: room.participants.map(p=>p.email),
       messageCount: room.messages.length,
-      age: ageStr
+      age: ageStr,
+      createdAt: room.createdAt
     });
   });
-  res.json(rooms);
+  res.json(rooms.sort((a,b)=>b.createdAt-a.createdAt));
 });
 
+// Admin - encerrar sala
 app.delete('/api/admin/shared-rooms/:code', auth, role('creator','admin'), (req,res) => {
   sharedRooms.delete(req.params.code);
   res.json({ ok: true });
+});
+
+// Admin - ver mensagens de uma sala
+app.get('/api/admin/shared-rooms/:code/messages', auth, role('creator','admin'), (req,res) => {
+  const room = sharedRooms.get(req.params.code);
+  if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+  res.json({ messages: room.messages.slice(-50), participants: room.participants });
 });
 
 // Logo upload route
