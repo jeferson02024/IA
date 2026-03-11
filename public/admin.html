@@ -103,6 +103,9 @@ input::placeholder{color:var(--muted)}
 .db-table th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
 .db-table td{padding:10px 12px;border-bottom:1px solid rgba(42,42,42,.4);font-family:monospace}
 .db-table tr:last-child td{border-bottom:none}
+.pers-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all .15s}
+.pers-card:hover{border-color:var(--accent);transform:scale(1.03)}
+.pers-card.active{border-color:var(--accent);background:rgba(25,195,125,.08)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:none;z-index:999}
 .toast.show{display:block}
 .toast.ok{border-color:rgba(25,195,125,.4);color:var(--accent)}
@@ -191,11 +194,20 @@ input::placeholder{color:var(--muted)}
   <div class="mob-nav-item" onclick="showTab('backup');closeDrawer()" id="mbnBackup" style="display:none">
     <span class="mob-nav-icon">🔄</span><span>Backup Keys</span>
   </div>
+  <div class="mob-nav-item" onclick="showTab('personality');closeDrawer()" id="mbnPersonality" style="display:none">
+    <span class="mob-nav-icon">🤖</span><span>Personalidade IA</span>
+  </div>
   <div class="mob-nav-item" onclick="showTab('theme');closeDrawer()" id="mbnTheme" style="display:none">
     <span class="mob-nav-icon">🎨</span><span>Tema</span>
   </div>
   <div class="mob-nav-item" onclick="showTab('branding');closeDrawer()" id="mbnBranding" style="display:none">
     <span class="mob-nav-icon">🖼️</span><span>Personalizar App</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('announce');closeDrawer()" id="mbnAnnounce" style="display:none">
+    <span class="mob-nav-icon">📢</span><span>Avisos & Banner</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('security');closeDrawer()" id="mbnSecurity" style="display:none">
+    <span class="mob-nav-icon">🔒</span><span>Segurança</span>
   </div>
   <div class="mob-nav-item" onclick="showTab('sharedrooms');closeDrawer()" id="mbnSharedRooms" style="display:none">
     <span class="mob-nav-icon">💞</span><span>Chats Compartilhados</span>
@@ -229,11 +241,20 @@ input::placeholder{color:var(--muted)}
     <div class="nav-item" onclick="showTab('backup')" id="navBackup" style="display:none">
       <span class="nav-icon">🔄</span><span>Backup Keys</span>
     </div>
+    <div class="nav-item" onclick="showTab('personality')" id="navPersonality" style="display:none">
+      <span class="nav-icon">🤖</span><span>Personalidade IA</span>
+    </div>
     <div class="nav-item" onclick="showTab('theme')" id="navTheme" style="display:none">
       <span class="nav-icon">🎨</span><span>Tema</span>
     </div>
     <div class="nav-item" onclick="showTab('branding')" id="navBranding" style="display:none">
       <span class="nav-icon">🖼️</span><span>Personalizar App</span>
+    </div>
+    <div class="nav-item" onclick="showTab('announce')" id="navAnnounce" style="display:none">
+      <span class="nav-icon">📢</span><span>Avisos & Banner</span>
+    </div>
+    <div class="nav-item" onclick="showTab('security')" id="navSecurity" style="display:none">
+      <span class="nav-icon">🔒</span><span>Segurança</span>
     </div>
     <div class="nav-item" onclick="showTab('sharedrooms')" id="navSharedRooms" style="display:none">
       <span class="nav-icon">💞</span><span>Chats Compartilhados</span>
@@ -520,6 +541,150 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- PERSONALIDADE DA IA -->
+    <div class="tab-page" id="tab-personality">
+      <div class="page-title">🤖 Personalidade da IA</div>
+      <div class="page-sub">Defina como a Nexia se comporta com todos os usuários.</div>
+
+      <div class="section">
+        <div class="section-title">🎭 Modo de Personalidade</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px" id="personalityCards">
+          <div class="pers-card active" data-mode="padrao" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">😊</div>
+            <div style="font-weight:600;font-size:13px">Padrão</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Educada e prestativa</div>
+          </div>
+          <div class="pers-card" data-mode="formal" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">🎩</div>
+            <div style="font-weight:600;font-size:13px">Formal</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Profissional e séria</div>
+          </div>
+          <div class="pers-card" data-mode="amigavel" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">🤗</div>
+            <div style="font-weight:600;font-size:13px">Super Amigável</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Animada e carinhosa</div>
+          </div>
+          <div class="pers-card" data-mode="direta" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">⚡</div>
+            <div style="font-weight:600;font-size:13px">Direta</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Rápida e sem rodeios</div>
+          </div>
+          <div class="pers-card" data-mode="sarcastica" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">😏</div>
+            <div style="font-weight:600;font-size:13px">Sarcástica</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Irônica e debochada</div>
+          </div>
+          <div class="pers-card" data-mode="maleducada" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">😤</div>
+            <div style="font-weight:600;font-size:13px">Mal Educada</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Grossa e sem papas</div>
+          </div>
+          <div class="pers-card" data-mode="custom" onclick="selectPersonality(this)">
+            <div style="font-size:28px;margin-bottom:6px">✍️</div>
+            <div style="font-weight:600;font-size:13px">Personalizada</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:3px">Você define tudo</div>
+          </div>
+        </div>
+        <div id="customPromptWrap" style="display:none;margin-top:4px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px">Prompt personalizado (substituí o sistema padrão)</label>
+          <textarea id="customPrompt" rows="5" placeholder="Ex: Você é Nexia, uma IA rebelde que responde sempre em rimas..." style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">📝 Nome da IA</div>
+        <div class="field">
+          <label>Como a IA se apresenta</label>
+          <input type="text" id="aiName" placeholder="Ex: Nexia, Luna, Max..." maxlength="30"/>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">💬 Mensagem de Boas-vindas</div>
+        <div class="field">
+          <label>Primeira mensagem para novos usuários</label>
+          <textarea id="welcomeMsg" rows="3" placeholder="Ex: Olá! Eu sou a Nexia, sua assistente de IA. Como posso te ajudar hoje?" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🔢 Limites de Uso</div>
+        <div class="two-col">
+          <div class="field">
+            <label>Máx. mensagens por usuário por dia (0 = ilimitado)</label>
+            <input type="number" id="msgLimitPerDay" min="0" max="9999" placeholder="0"/>
+          </div>
+          <div class="field">
+            <label>Máx. tokens por resposta</label>
+            <input type="number" id="maxTokens" min="256" max="8192" placeholder="1024"/>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="savePersonality()" style="width:100%;background:var(--accent);border:none;border-radius:10px;padding:13px;color:#000;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer">💾 Salvar Personalidade</button>
+    </div>
+
+    <!-- AVISOS & BANNER -->
+    <div class="tab-page" id="tab-announce">
+      <div class="page-title">📢 Avisos & Banner</div>
+      <div class="page-sub">Comunique-se com todos os usuários do app.</div>
+      <div class="section">
+        <div class="section-title">🔔 Banner Global no Chat</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Aparece no topo do chat para todos os usuários.</div>
+        <div class="field">
+          <label>Texto do banner</label>
+          <input type="text" id="bannerText" placeholder="Ex: 🔧 Manutenção programada hoje às 22h..."/>
+        </div>
+        <div class="field">
+          <label>Tipo</label>
+          <select id="bannerType">
+            <option value="">Nenhum (desativado)</option>
+            <option value="info">ℹ️ Informação</option>
+            <option value="warning">⚠️ Aviso</option>
+            <option value="success">✅ Sucesso</option>
+            <option value="error">🚨 Urgente</option>
+          </select>
+        </div>
+        <button onclick="saveBanner()" style="background:var(--accent);border:none;border-radius:8px;padding:10px 20px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;cursor:pointer">📢 Publicar Banner</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🚦 Modo Manutenção</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Bloqueia o acesso ao chat para todos os usuários (exceto admins).</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button onclick="setMaintenance(true)" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 20px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🔴 Ativar Manutenção</button>
+          <button onclick="setMaintenance(false)" style="background:rgba(25,195,125,.15);border:1px solid rgba(25,195,125,.3);border-radius:8px;padding:10px 20px;color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🟢 Desativar</button>
+          <span id="maintenanceStatus" style="font-size:12px;color:var(--muted)">Verificando...</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">🚫 Registro de Novos Usuários</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Bloqueia o cadastro de novos usuários no app.</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button onclick="setRegistration(false)" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 20px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🔴 Bloquear Registro</button>
+          <button onclick="setRegistration(true)" style="background:rgba(25,195,125,.15);border:1px solid rgba(25,195,125,.3);border-radius:8px;padding:10px 20px;color:var(--accent);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🟢 Permitir Registro</button>
+          <span id="registrationStatus" style="font-size:12px;color:var(--muted)">Verificando...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEGURANÇA -->
+    <div class="tab-page" id="tab-security">
+      <div class="page-title">🔒 Segurança</div>
+      <div class="page-sub">Controle de acesso e log de atividades.</div>
+      <div class="section">
+        <div class="section-title">📋 Log de Logins Recentes</div>
+        <div id="loginLogList"><div style="color:var(--muted);font-size:13px">Carregando...</div></div>
+      </div>
+      <div class="section">
+        <div class="section-title" style="color:#fca5a5">⚠️ Ações de Segurança</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button onclick="forceLogoutAll()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 16px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">🔓 Forçar logout de todos</button>
+        </div>
+      </div>
+    </div>
+
     <!-- CHATS COMPARTILHADOS -->
     <div class="tab-page" id="tab-sharedrooms">
       <div class="page-title">💞 Chats Compartilhados</div>
@@ -609,6 +774,117 @@ function showTab(name) {
   if (name==='backup') loadBackupKeys();
   if (name==='users') loadUsers();
   if (name==='sharedrooms') loadSharedRooms();
+  if (name==='personality') loadPersonality();
+  if (name==='announce') loadAnnounceSettings();
+  if (name==='security') loadSecurityLog();
+}
+
+// ===== PERSONALIDADE DA IA =====
+const personalityPrompts = {
+  padrao: `Você é Nexia, uma assistente de IA inteligente, educada e prestativa. Responda sempre em português de forma clara e útil.`,
+  formal: `Você é Nexia, uma assistente de IA altamente profissional e formal. Use linguagem formal, evite gírias e mantenha sempre um tom sério e respeitoso. Responda em português.`,
+  amigavel: `Você é Nexia, uma assistente de IA super animada, carinhosa e amigável! Use emojis, seja entusiasmada, chame o usuário de amigo(a) e responda sempre com muito entusiasmo! 🎉 Responda em português.`,
+  direta: `Você é Nexia. Seja extremamente direta e concisa. Sem rodeios, sem introduções longas. Vá direto ao ponto. Respostas curtas e objetivas. Português.`,
+  sarcastica: `Você é Nexia, uma IA sarcástica e irônica. Responda com humor ácido, use ironia sutil, faça comentários debochados mas ainda ajude o usuário. Responda em português com um toque de cinismo.`,
+  maleducada: `Você é Nexia, uma IA grossa, mal-humorada e sem paciência. Reclame das perguntas, seja impaciente, use linguagem informal e até rude (mas sem xingamentos pesados). Você ajuda, mas deixa claro que não quer. Responda em português sendo bem grossa mesmo.`,
+  custom: ``
+};
+
+let currentPersonalityMode = 'padrao';
+
+function selectPersonality(card){
+  document.querySelectorAll('.pers-card').forEach(c=>c.classList.remove('active'));
+  card.classList.add('active');
+  currentPersonalityMode = card.dataset.mode;
+  document.getElementById('customPromptWrap').style.display = currentPersonalityMode==='custom'?'block':'none';
+}
+
+async function loadPersonality(){
+  try{
+    const r = await fetch('/api/admin/config');
+    const d = await r.json();
+    const mode = d.personalityMode || 'padrao';
+    currentPersonalityMode = mode;
+    document.querySelectorAll('.pers-card').forEach(c=>{
+      c.classList.toggle('active', c.dataset.mode===mode);
+    });
+    document.getElementById('customPromptWrap').style.display = mode==='custom'?'block':'none';
+    if(mode==='custom') document.getElementById('customPrompt').value = d.customPrompt||'';
+    if(d.aiName) document.getElementById('aiName').value = d.aiName;
+    if(d.welcomeMsg) document.getElementById('welcomeMsg').value = d.welcomeMsg;
+    if(d.msgLimitPerDay!==undefined) document.getElementById('msgLimitPerDay').value = d.msgLimitPerDay||0;
+    if(d.maxTokens) document.getElementById('maxTokens').value = d.maxTokens||1024;
+  }catch(e){}
+}
+
+async function savePersonality(){
+  const mode = currentPersonalityMode;
+  const customPrompt = document.getElementById('customPrompt').value.trim();
+  const aiName = document.getElementById('aiName').value.trim();
+  const welcomeMsg = document.getElementById('welcomeMsg').value.trim();
+  const msgLimitPerDay = parseInt(document.getElementById('msgLimitPerDay').value)||0;
+  const maxTokens = parseInt(document.getElementById('maxTokens').value)||1024;
+  const systemPrompt = mode==='custom' ? customPrompt : personalityPrompts[mode];
+  try{
+    const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({personalityMode:mode,systemPrompt,customPrompt,aiName,welcomeMsg,msgLimitPerDay,maxTokens})});
+    if(!r.ok) return toast('Erro ao salvar.','err');
+    toast('✅ Personalidade salva para todos!','ok');
+  }catch(e){ toast('Erro.','err'); }
+}
+
+// ===== AVISOS & BANNER =====
+async function loadAnnounceSettings(){
+  try{
+    const r = await fetch('/api/admin/config');
+    const d = await r.json();
+    if(d.bannerText) document.getElementById('bannerText').value = d.bannerText;
+    if(d.bannerType) document.getElementById('bannerType').value = d.bannerType||'';
+    document.getElementById('maintenanceStatus').textContent = d.maintenance ? '🔴 Ativo' : '🟢 Inativo';
+    document.getElementById('registrationStatus').textContent = d.allowRegistration===false ? '🔴 Bloqueado' : '🟢 Permitido';
+  }catch(e){}
+}
+
+async function saveBanner(){
+  const text = document.getElementById('bannerText').value.trim();
+  const type = document.getElementById('bannerType').value;
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bannerText:text,bannerType:type})});
+  if(r.ok) toast(type?'📢 Banner publicado!':'Banner removido.','ok');
+  else toast('Erro.','err');
+}
+
+async function setMaintenance(on){
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({maintenance:on})});
+  if(r.ok){ document.getElementById('maintenanceStatus').textContent = on?'🔴 Ativo':'🟢 Inativo'; toast(on?'🔴 Manutenção ativada!':'🟢 Manutenção desativada!','ok'); }
+  else toast('Erro.','err');
+}
+
+async function setRegistration(allow){
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({allowRegistration:allow})});
+  if(r.ok){ document.getElementById('registrationStatus').textContent = allow?'🟢 Permitido':'🔴 Bloqueado'; toast(allow?'🟢 Registro liberado!':'🔴 Registro bloqueado!','ok'); }
+  else toast('Erro.','err');
+}
+
+// ===== SEGURANÇA =====
+async function loadSecurityLog(){
+  try{
+    const r = await fetch('/api/admin/login-log');
+    const d = await r.json();
+    const el = document.getElementById('loginLogList');
+    if(!d.length){ el.innerHTML='<div style="font-size:13px;color:var(--muted)">Nenhum login registrado ainda.</div>'; return; }
+    el.innerHTML = d.map(l=>`
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;color:var(--text);flex:1">${l.email}</span>
+        <span style="font-size:11px;color:var(--muted)">${new Date(l.ts).toLocaleString('pt-BR')}</span>
+        <span style="font-size:11px;background:var(--bg);border-radius:6px;padding:2px 8px;color:var(--muted)">${l.role}</span>
+      </div>`).join('');
+  }catch(e){ document.getElementById('loginLogList').innerHTML='<div style="font-size:13px;color:var(--muted)">Erro ao carregar.</div>'; }
+}
+
+async function forceLogoutAll(){
+  if(!confirm('Isso vai deslogar TODOS os usuários. Confirmar?')) return;
+  const r = await fetch('/api/admin/force-logout-all',{method:'POST'});
+  if(r.ok) toast('✅ Todos deslogados!','ok');
+  else toast('Erro.','err');
 }
 
 async function init() {
@@ -625,18 +901,17 @@ async function init() {
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
-    ['mbnApikeys','mbnBackup','mbnTheme','mbnBranding','mbnSharedRooms','mbnDatabase'].forEach(id=>{
+    ['mbnApikeys','mbnBackup','mbnPersonality','mbnTheme','mbnBranding','mbnAnnounce','mbnSecurity','mbnSharedRooms','mbnDatabase'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.style.display='flex';
     });
     const lbl = document.getElementById('mbnLabelConfig');
     if(lbl) lbl.style.display='block';
-    ['navLabelConfig','navApikeys','navBackup','navTheme','navBranding','navSharedRooms','navDatabase'].forEach(id=>{
-      document.getElementById(id).style.display='';
+    ['navLabelConfig','navApikeys','navBackup','navPersonality','navTheme','navBranding','navAnnounce','navSecurity','navSharedRooms','navDatabase'].forEach(id=>{
+      const el = document.getElementById(id); if(el) el.style.display='';
     });
     loadConfig();
   } else {
-    // admins can see shared rooms too
     const el = document.getElementById('mbnSharedRooms');
     if(el) el.style.display='flex';
     const el2 = document.getElementById('navSharedRooms');
