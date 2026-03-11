@@ -213,6 +213,15 @@ input::placeholder{color:var(--muted)}
   <div class="mob-nav-item" onclick="showTab('security');closeDrawer()" id="mbnSecurity" style="display:none">
     <span class="mob-nav-icon">🔒</span><span>Segurança</span>
   </div>
+  <div class="mob-nav-item" onclick="showTab('errorlog');closeDrawer()" id="mbnErrorlog" style="display:none">
+    <span class="mob-nav-icon">🐛</span><span>Log de Erros</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('blacklist');closeDrawer()" id="mbnBlacklist" style="display:none">
+    <span class="mob-nav-icon">🚫</span><span>Blacklist</span>
+  </div>
+  <div class="mob-nav-item" onclick="showTab('changelog');closeDrawer()" id="mbnChangelog" style="display:none">
+    <span class="mob-nav-icon">📝</span><span>Histórico</span>
+  </div>
   <div class="mob-nav-item" onclick="showTab('sharedrooms');closeDrawer()" id="mbnSharedRooms" style="display:none">
     <span class="mob-nav-icon">💞</span><span>Chats Compartilhados</span>
   </div>
@@ -1125,7 +1134,7 @@ async function init() {
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
-    ['mbnApikeys','mbnBackup','mbnPersonality','mbnTheme','mbnBranding','mbnAnnounce','mbnSecurity','mbnSharedRooms','mbnDatabase'].forEach(id=>{
+    ['mbnApikeys','mbnBackup','mbnPersonality','mbnTheme','mbnBranding','mbnAnnounce','mbnSecurity','mbnErrorlog','mbnBlacklist','mbnChangelog','mbnSharedRooms','mbnDatabase'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.style.display='flex';
     });
     const lbl = document.getElementById('mbnLabelConfig');

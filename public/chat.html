@@ -903,7 +903,7 @@ async function send(){
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
-    if(!r.ok){addMsg('ai','❌ '+d.error,provider);history.pop();}
+    if(!r.ok){addMsgStreaming('ai','❌ '+d.error,provider);history.pop();}
     else{
       // Backend já detectou e retorna imageUrl se for pedido de imagem
       const codeBlocks = extractCodeBlocks(d.reply);
@@ -925,10 +925,10 @@ async function send(){
       const wantsImage = /crie uma (imagem|foto|desenho|ilustra)|gere uma (imagem|foto)|gera uma (imagem|foto)|gerar imagem|criar imagem|cria uma (imagem|foto)|faça uma (imagem|foto)|faz uma (imagem|foto)|desenhe|ilustre/i.test(lastMsg);
 
       if(d.imageUrl){
-        if(cleanReply) addMsg('ai', cleanReply, provider);
+        if(cleanReply) addMsgStreaming('ai', cleanReply, provider);
         showGeneratedImage(d.imageUrl);
       } else if(d.imagePrompt){
-        if(cleanReply) addMsg('ai', cleanReply, provider);
+        if(cleanReply) addMsgStreaming('ai', cleanReply, provider);
         generateImageFrontend(d.imagePrompt);
       } else if(imgTagMatch){
         if(cleanReply) addMsgStreaming('ai', cleanReply, provider);
@@ -974,7 +974,7 @@ async function send(){
     }
   }catch{
     document.getElementById(tid)?.remove();
-    addMsg('ai','❌ Erro de conexão.',provider);history.pop();
+    addMsgStreaming('ai','❌ Erro de conexão.',provider);history.pop();
   }
   loading=false;document.getElementById('sendBtn').disabled=false;input.focus();
 }
@@ -1112,7 +1112,7 @@ async function generateImageFrontend(prompt, attempt=1){
     } else {
       loadDiv.remove();
       document.getElementById('imgLoadDiv')?.remove();
-      addMsg('ai','❌ Não consegui gerar a imagem após várias tentativas.',provider);
+      addMsgStreaming('ai','❌ Não consegui gerar a imagem após várias tentativas.',provider);
     }
   }, 30000);
 
