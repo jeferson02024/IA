@@ -865,33 +865,43 @@ app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
 
     // Call AI in background
     try {
-      const cfg = await q('SELECT value FROM config WHERE key=$1', ['groq_key']);
-      const apiKey = cfg.rows[0]?.value;
-      if(!apiKey) return;
+      const { provider, model } = req.body;
+      const cfg = await q('SELECT key, value FROM config WHERE key IN ($1,$2,$3,$4,$5,$6,$7)', ['groq_key','gemini_key','mistral_key','openrouter_key','groq_model','gemini_model','mistral_model']);
+      const cfgMap = {};
+      cfg.rows.forEach(r => cfgMap[r.key] = r.value);
+
+      let aiText = '';
 
       const history = room.messages.slice(-20)
         .filter(m=>m.role==='user'||m.role==='assistant')
-        .map(m=>({ role: m.role==='assistant'?'assistant':'user', content: typeof m.content==='string'?m.content:JSON.stringify(m.content) }));
+        .map(m=>({ role: m.role, content: typeof m.content==='string'?m.content:JSON.stringify(m.content) }));
 
-      const aiRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method:'POST',
-        headers:{ 'Authorization':`Bearer ${apiKey}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({
-          model: model || 'llama-3.3-70b-versatile',
-          messages: [
-            { role:'system', content:`Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${room.participants.length} pessoas. Responda sempre em português. Se o usuário pedir para criar/gerar imagem, responda normalmente que está gerando e use: ##IMG## descrição em inglês ##ENDIMG##` },
-            ...history
-          ],
-          max_tokens: 1024
-        }),
-        signal: AbortSignal.timeout(30000)
-      });
+      const systemPrompt = `Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${room.participants.length} pessoas. Responda sempre em português. Se o usuário pedir para gerar imagem, responda: ##IMG## descrição em inglês ##ENDIMG##`;
 
-      if(!aiRes.ok) return;
-      const aiData = await aiRes.json();
-      const aiText = aiData.choices?.[0]?.message?.content || '';
+      const selectedModel = model || cfgMap[`${provider||'groq'}_model`] || 'llama-3.3-70b-versatile';
+      const selectedProvider = provider || 'groq';
+
+      if(selectedProvider === 'groq'){
+        const key = cfgMap['groq_key']; if(!key) return;
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+      } else if(selectedProvider === 'gemini'){
+        const key = cfgMap['gemini_key']; if(!key) return;
+        const gModel = selectedModel||'gemini-2.0-flash';
+        const contents = history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:1024}}),signal:AbortSignal.timeout(30000)});
+        if(!res.ok) return; const data = await res.json(); aiText = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      } else if(selectedProvider === 'mistral'){
+        const key = cfgMap['mistral_key']; if(!key) return;
+        const res = await fetch('https://api.mistral.ai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel||'mistral-large-latest',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+      } else if(selectedProvider === 'openrouter'){
+        const key = cfgMap['openrouter_key']; if(!key) return;
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json','HTTP-Referer':'https://ia-2-uvqg.onrender.com'},body:JSON.stringify({model:selectedModel||'openrouter/auto',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+      }
+
       if(!aiText) return;
-
       const aiMsg = { id: Date.now()+1, email: 'Nexia', role: 'assistant', content: aiText, ts: Date.now() };
       room.messages.push(aiMsg);
       if(room.messages.length > 500) room.messages = room.messages.slice(-500);
