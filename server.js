@@ -866,7 +866,7 @@ app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
     // Call AI in background
     try {
       const { provider, model } = req.body;
-      const cfg = await q('SELECT key, value FROM config WHERE key IN ($1,$2,$3,$4,$5,$6,$7)', ['groq_key','gemini_key','mistral_key','openrouter_key','groq_model','gemini_model','mistral_model']);
+      const cfg = await q("SELECT key, value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_mistral_key','global_openrouter_key','global_groq_model','global_gemini_model','global_mistral_model')");
       const cfgMap = {};
       cfg.rows.forEach(r => cfgMap[r.key] = r.value);
 
@@ -878,25 +878,25 @@ app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
 
       const systemPrompt = `Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${room.participants.length} pessoas. Responda sempre em português. Se o usuário pedir para gerar imagem, responda: ##IMG## descrição em inglês ##ENDIMG##`;
 
-      const selectedModel = model || cfgMap[`${provider||'groq'}_model`] || 'llama-3.3-70b-versatile';
       const selectedProvider = provider || 'groq';
+      const selectedModel = model || cfgMap[`global_${selectedProvider}_model`] || 'llama-3.3-70b-versatile';
 
       if(selectedProvider === 'groq'){
-        const key = cfgMap['groq_key']; if(!key) return;
+        const key = cfgMap['global_groq_key']; if(!key) return;
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
         if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
       } else if(selectedProvider === 'gemini'){
-        const key = cfgMap['gemini_key']; if(!key) return;
+        const key = cfgMap['global_gemini_key']; if(!key) return;
         const gModel = selectedModel||'gemini-2.0-flash';
         const contents = history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:1024}}),signal:AbortSignal.timeout(30000)});
         if(!res.ok) return; const data = await res.json(); aiText = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
       } else if(selectedProvider === 'mistral'){
-        const key = cfgMap['mistral_key']; if(!key) return;
+        const key = cfgMap['global_mistral_key']; if(!key) return;
         const res = await fetch('https://api.mistral.ai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel||'mistral-large-latest',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
         if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
       } else if(selectedProvider === 'openrouter'){
-        const key = cfgMap['openrouter_key']; if(!key) return;
+        const key = cfgMap['global_openrouter_key']; if(!key) return;
         const res = await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json','HTTP-Referer':'https://ia-2-uvqg.onrender.com'},body:JSON.stringify({model:selectedModel||'openrouter/auto',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
         if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
       }
