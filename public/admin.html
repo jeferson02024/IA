@@ -891,23 +891,66 @@ async function loadSharedRooms(){
     const el = document.getElementById('sharedRoomsList');
     if(!rooms.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhuma sala ativa no momento.</div>'; return; }
     el.innerHTML = rooms.map(room => `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span style="font-size:16px;font-weight:700;color:#c084fc;letter-spacing:2px">${room.code}</span>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:18px;font-weight:800;color:#c084fc;letter-spacing:3px">${room.code}</span>
+            <span style="background:rgba(244,114,182,.1);border:1px solid rgba(244,114,182,.2);border-radius:20px;padding:3px 10px;font-size:11px;color:#f472b6">💞 Sala ativa</span>
+          </div>
           <span style="font-size:11px;color:var(--muted)">${room.age}</span>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
-          <span>👥 ${room.participants} participante(s)</span>
-          <span>💬 ${room.messageCount} mensagem(s)</span>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:#c084fc">${room.participants}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Participantes</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:var(--blue)">${room.messageCount}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Mensagens</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:700;color:var(--accent)">8</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Limite</div>
+          </div>
         </div>
-        ${room.participants > 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${room.participantList.join(' · ')}</div>` : ''}
-        <button onclick="deleteSharedRoom('${room.code}')" style="margin-top:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:4px 12px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:11px;cursor:pointer">🗑 Encerrar sala</button>
+
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">👑 Criador da sala</div>
+          <div style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.2);border-radius:8px;padding:7px 12px;font-size:13px;color:#c084fc">${room.createdBy}</div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">👥 Participantes na sala</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${room.participantList.map(email=>`
+              <span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;color:${email===room.createdBy?'#c084fc':'var(--text)'}">
+                ${email===room.createdBy?'👑 ':'🧑 '}${email}
+              </span>`).join('')}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button onclick="viewRoomMessages('${room.code}')" style="flex:1;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:8px;padding:8px;color:#93c5fd;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">💬 Ver mensagens</button>
+          <button onclick="deleteSharedRoom('${room.code}')" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:8px 14px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🗑 Encerrar</button>
+        </div>
       </div>`).join('');
   }catch(e){ document.getElementById('sharedRoomsList').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Erro ao carregar.</div>'; }
 }
 
+async function viewRoomMessages(code){
+  try{
+    const r = await fetch(`/api/admin/shared-rooms/${code}/messages`);
+    const d = await r.json();
+    if(!r.ok){ toast('Erro ao carregar mensagens.','err'); return; }
+    const msgs = d.messages.slice(-20);
+    const txt = msgs.map(m=>`[${m.role==='assistant'?'Nexia':m.email}]: ${(m.content||'').substring(0,120)}`).join('\n');
+    alert(`Últimas mensagens da sala ${code}:\n\n${txt||'Nenhuma mensagem.'}`);
+  }catch(e){ toast('Erro.','err'); }
+}
+
 async function deleteSharedRoom(code){
-  if(!confirm(`Encerrar sala ${code}?`)) return;
+  if(!confirm(`Encerrar sala ${code}? Os participantes serão removidos.`)) return;
   const r = await fetch(`/api/admin/shared-rooms/${code}`, {method:'DELETE'});
   if(r.ok){ toast('Sala encerrada.','ok'); loadSharedRooms(); }
   else toast('Erro ao encerrar.','err');

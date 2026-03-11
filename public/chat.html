@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nexia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -296,46 +297,60 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
   </div>
 </div>
 
-<!-- Shared Chat Modal -->
+<!-- Shared Chat Modal - Lobby -->
 <div class="overlay" id="sharedChatOverlay" onclick="closeOut(event,'sharedChatOverlay')">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:460px">
     <h3>💞 Chat Compartilhado</h3>
-    <p>Crie uma sala privada e convide alguém para conversar juntos. As outras conversas continuam privadas.</p>
-
+    <p>Converse com a Nexia junto com até 8 amigos em tempo real. Suas outras conversas continuam privadas.</p>
     <div id="scNoRoom">
-      <button onclick="createSharedRoom()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#f472b6);border:none;border-radius:10px;padding:13px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px">✨ Criar nova sala</button>
-      <div style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px">— ou —</div>
+      <button onclick="createSharedRoom()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#f472b6);border:none;border-radius:10px;padding:14px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px">✨ Criar nova sala</button>
+      <div style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:12px">— ou entre em uma sala existente —</div>
       <div style="display:flex;gap:8px">
-        <input type="text" id="joinRoomCode" placeholder="Cole o código da sala aqui..." style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none">
-        <button onclick="joinSharedRoom()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 16px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">Entrar</button>
+        <input type="text" id="joinRoomCode" placeholder="Código da sala (ex: AB3X9K)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none;text-transform:uppercase;letter-spacing:2px">
+        <button onclick="joinSharedRoom()" style="background:#7c3aed;border:none;border-radius:8px;padding:10px 18px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Entrar</button>
       </div>
     </div>
-
-    <div id="scRoom" style="display:none">
-      <div style="background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(244,114,182,.1));border:1px solid rgba(124,58,237,.3);border-radius:12px;padding:16px;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Código da sala</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="scRoomCode" style="font-size:20px;font-weight:700;color:#c084fc;letter-spacing:3px;flex:1"></span>
-          <button onclick="copyRoomCode()" style="background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.3);border-radius:6px;padding:5px 10px;color:#c084fc;font-size:12px;cursor:pointer">Copiar</button>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px">👥 Participantes: <span id="scParticipants">1</span>/2</div>
-      </div>
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;height:220px;overflow-y:auto;padding:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px" id="scMessages">
-        <div style="text-align:center;font-size:12px;color:var(--muted)">Sala criada! Compartilhe o código com a outra pessoa. 💞</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="scInput" placeholder="Mensagem..." onkeydown="if(event.key==='Enter')sendSharedMsg()" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none">
-        <button onclick="sendSharedMsg()" style="background:#7c3aed;border:none;border-radius:8px;padding:9px 16px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">Enviar</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button onclick="shareRoomWhatsApp()" style="flex:1;background:#25d366;border:none;border-radius:8px;padding:9px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer">📲 Convidar no WhatsApp</button>
-        <button onclick="leaveSharedRoom()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:9px 14px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">Sair</button>
-      </div>
-    </div>
-
     <div class="modal-btns">
       <button class="btn-cancel" onclick="document.getElementById('sharedChatOverlay').classList.remove('show')">Fechar</button>
     </div>
+  </div>
+</div>
+
+<!-- Shared Chat Full Screen -->
+<div id="sharedChatRoom" style="display:none;position:fixed;inset:0;z-index:500;background:var(--bg);flex-direction:column">
+  <!-- Header -->
+  <div style="background:var(--sidebar);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <img src="/logo.png" style="width:32px;height:32px;border-radius:8px;object-fit:cover">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:600;color:var(--text)">Nexia — Chat Compartilhado</div>
+      <div style="font-size:11px;color:var(--muted)">Sala: <span id="scRoomCodeDisplay" style="color:#c084fc;font-weight:700;letter-spacing:1px"></span> · <span id="scParticipantsDisplay">1</span> pessoa(s)</div>
+    </div>
+    <button onclick="copyRoomCode()" style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);border-radius:8px;padding:6px 12px;color:#c084fc;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap">📋 Código</button>
+    <button onclick="shareRoomWhatsApp()" style="background:#25d366;border:none;border-radius:8px;padding:6px 12px;color:#fff;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📲 Convidar</button>
+    <button onclick="leaveSharedRoom()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:6px 12px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">Sair</button>
+  </div>
+
+  <!-- Participants bar -->
+  <div id="scParticipantsBar" style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div>
+
+  <!-- Messages -->
+  <div id="scMessages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px"></div>
+
+  <!-- Typing indicator -->
+  <div id="scTyping" style="display:none;padding:4px 16px 0;font-size:12px;color:var(--muted)">Nexia está digitando...</div>
+
+  <!-- Input -->
+  <div style="background:var(--sidebar);border-top:1px solid var(--border);padding:12px 16px;flex-shrink:0">
+    <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;gap:8px;padding:8px 12px">
+      <textarea id="scInput" placeholder="Envie uma mensagem para a Nexia e seus amigos..." rows="1"
+        style="flex:1;background:none;border:none;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;resize:none;outline:none;max-height:120px;overflow-y:auto"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendSharedMsg();}"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <button onclick="sendSharedMsg()" style="background:#7c3aed;border:none;border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">Enter para enviar · Shift+Enter nova linha · Sala para até 8 pessoas</div>
   </div>
 </div>
 
@@ -1029,107 +1044,162 @@ function shareWhatsApp(){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-// ===== SHARED CHAT =====
-let scRoomId = null, scPollInterval = null, scLastMsg = 0;
+// ===== SHARED CHAT ROOM =====
+let scRoomId = null, scPollInterval = null, scLastTs = 0, scAllMessages = [];
 
 function openSharedChat(){
-  // Check if already in a room
-  const savedRoom = localStorage.getItem('scRoomId');
-  if(savedRoom){ scRoomId = savedRoom; showScRoom(savedRoom); }
-  else { document.getElementById('scNoRoom').style.display=''; document.getElementById('scRoom').style.display='none'; }
+  const saved = localStorage.getItem('scRoomId');
+  if(saved){ scRoomId = saved; enterRoom(saved); return; }
+  document.getElementById('scNoRoom').style.display='';
   document.getElementById('sharedChatOverlay').classList.add('show');
 }
 
 async function createSharedRoom(){
   try{
-    const r = await fetch('/api/shared-room', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'create'})});
+    const r = await fetch('/api/shared-room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create'})});
     const d = await r.json();
     if(!r.ok){ toast(d.error||'Erro ao criar sala.','err'); return; }
     scRoomId = d.code;
     localStorage.setItem('scRoomId', scRoomId);
-    showScRoom(d.code);
+    document.getElementById('sharedChatOverlay').classList.remove('show');
+    enterRoom(d.code);
   }catch(e){ toast('Erro ao criar sala.','err'); }
 }
 
 async function joinSharedRoom(){
   const code = document.getElementById('joinRoomCode').value.trim().toUpperCase();
-  if(!code){ toast('Cole o código da sala.','err'); return; }
+  if(!code){ toast('Digite o código da sala.','err'); return; }
   try{
-    const r = await fetch('/api/shared-room', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'join', code})});
+    const r = await fetch('/api/shared-room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'join',code})});
     const d = await r.json();
     if(!r.ok){ toast(d.error||'Sala não encontrada.','err'); return; }
     scRoomId = code;
     localStorage.setItem('scRoomId', scRoomId);
-    showScRoom(code);
+    document.getElementById('sharedChatOverlay').classList.remove('show');
+    enterRoom(code);
   }catch(e){ toast('Erro ao entrar na sala.','err'); }
 }
 
-function showScRoom(code){
-  document.getElementById('scNoRoom').style.display='none';
-  document.getElementById('scRoom').style.display='';
-  document.getElementById('scRoomCode').textContent = code;
-  loadScMessages();
+function enterRoom(code){
+  scLastTs = 0; scAllMessages = [];
+  document.getElementById('scRoomCodeDisplay').textContent = code;
+  document.getElementById('scMessages').innerHTML = '';
+  document.getElementById('sharedChatRoom').style.display = 'flex';
+  document.getElementById('scInput').focus();
+  loadScMessages(true);
   if(scPollInterval) clearInterval(scPollInterval);
-  scPollInterval = setInterval(loadScMessages, 2000);
+  scPollInterval = setInterval(()=>loadScMessages(false), 2000);
 }
 
-async function loadScMessages(){
+async function loadScMessages(initial){
   if(!scRoomId) return;
   try{
-    const r = await fetch(`/api/shared-room/${scRoomId}/messages`);
-    if(!r.ok) return;
+    const r = await fetch(`/api/shared-room/${scRoomId}/messages?since=${scLastTs}`);
+    if(!r.ok){ if(r.status===404){ toast('Sala encerrada.','err'); leaveSharedRoom(); } return; }
     const d = await r.json();
-    document.getElementById('scParticipants').textContent = d.participants || 1;
-    const box = document.getElementById('scMessages');
-    if(d.messages && d.messages.length !== scLastMsg){
-      scLastMsg = d.messages.length;
-      box.innerHTML = d.messages.length === 0
-        ? '<div style="text-align:center;font-size:12px;color:var(--muted)">Sala criada! Compartilhe o código com a outra pessoa. 💞</div>'
-        : d.messages.map(m => {
-            const isMe = m.email === (me?.email);
-            return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:2px">
-              <span style="font-size:10px;color:var(--muted)">${m.email}</span>
-              <div style="background:${isMe?'#7c3aed':'var(--surface)'};border-radius:10px;padding:8px 12px;max-width:85%;font-size:13px;color:#fff">${escHtml(m.text)}</div>
-            </div>`;
-          }).join('');
-      box.scrollTop = box.scrollHeight;
+
+    document.getElementById('scParticipantsDisplay').textContent = d.participants.length;
+    document.getElementById('scParticipantsBar').innerHTML = d.participants.map(p =>
+      `<span style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:${p.email===me?.email?'#c084fc':'var(--muted)'}">
+        ${p.email===me?.email?'👤 Você':p.email.split('@')[0]}
+      </span>`
+    ).join('');
+
+    if(initial && d.allMessages){
+      scAllMessages = d.allMessages;
+      renderScMessages(scAllMessages);
+      if(d.allMessages.length) scLastTs = d.allMessages[d.allMessages.length-1].ts;
+      return;
+    }
+
+    if(d.messages && d.messages.length){
+      d.messages.forEach(m => { scAllMessages.push(m); appendScMessage(m); });
+      scLastTs = d.messages[d.messages.length-1].ts;
+      document.getElementById('scTyping').style.display = 'none';
     }
   }catch(e){}
+}
+
+function renderScMessages(msgs){
+  const box = document.getElementById('scMessages');
+  if(!msgs.length){
+    box.innerHTML = `<div style="text-align:center;padding:60px 20px">
+      <div style="font-size:52px;margin-bottom:14px">💞</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">Sala criada!</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6">Compartilhe o código <strong style="color:#c084fc;font-size:16px;letter-spacing:2px">${scRoomId}</strong><br>com seus amigos e conversem com a Nexia juntos! 🤖</div>
+    </div>`;
+    return;
+  }
+  box.innerHTML = '';
+  msgs.forEach(m => appendScMessage(m, true));
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendScMessage(m, noScroll){
+  const box = document.getElementById('scMessages');
+  const emptyState = box.querySelector('div[style*="text-align:center"]');
+  if(emptyState) box.innerHTML = '';
+
+  const isMe = m.email === me?.email;
+  const isAI = m.role === 'assistant';
+
+  let content = escHtml(m.content||'');
+  content = content.replace(/##IMG## (.*?) ##ENDIMG##/g, (_,desc)=>
+    `<img src="https://image.pollinations.ai/prompt/${encodeURIComponent(desc)}?width=400&height=400&nologo=true" style="max-width:100%;border-radius:10px;margin-top:8px;display:block" loading="lazy">`
+  );
+  content = content.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  content = content.replace(/\n/g,'<br>');
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:3px;margin-bottom:2px`;
+
+  const labelText = isAI ? `<img src="/logo.png" style="width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:4px">Nexia`
+    : isMe ? '👤 Você' : `🧑 ${m.email.split('@')[0]}`;
+
+  wrap.innerHTML = `
+    <span style="font-size:10px;color:var(--muted);padding:0 4px">${labelText}</span>
+    <div style="background:${isAI?'var(--surface)':isMe?'#7c3aed':'#2d2d4a'};border-radius:${isMe?'14px 14px 4px 14px':'14px 14px 14px 4px'};padding:10px 14px;max-width:78%;font-size:14px;color:var(--text);line-height:1.55;word-break:break-word">${content}</div>`;
+
+  box.appendChild(wrap);
+  if(!noScroll) box.scrollTop = box.scrollHeight;
 }
 
 async function sendSharedMsg(){
   const input = document.getElementById('scInput');
   const text = input.value.trim();
   if(!text || !scRoomId) return;
-  input.value = '';
+  input.value = ''; input.style.height = 'auto';
+  document.getElementById('scTyping').style.display = 'block';
   try{
-    await fetch(`/api/shared-room/${scRoomId}/messages`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})});
-    loadScMessages();
-  }catch(e){ toast('Erro ao enviar.','err'); }
+    const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const d = await r.json();
+    if(!r.ok){ toast(d.error||'Erro.','err'); return; }
+    if(d.msg){ scAllMessages.push(d.msg); appendScMessage(d.msg); scLastTs = d.msg.ts; }
+    setTimeout(()=>loadScMessages(false), 2000);
+    setTimeout(()=>loadScMessages(false), 4000);
+    setTimeout(()=>{ loadScMessages(false); document.getElementById('scTyping').style.display='none'; }, 6000);
+  }catch(e){ toast('Erro ao enviar.','err'); document.getElementById('scTyping').style.display='none'; }
 }
 
 function copyRoomCode(){
   navigator.clipboard.writeText(scRoomId).then(()=>toast('Código copiado!','ok')).catch(()=>{
-    const el = document.createElement('textarea');
-    el.value = scRoomId; document.body.appendChild(el); el.select();
-    document.execCommand('copy'); document.body.removeChild(el);
-    toast('Código copiado!','ok');
+    const el=document.createElement('textarea'); el.value=scRoomId; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); toast('Código copiado!','ok');
   });
 }
 
 function shareRoomWhatsApp(){
-  const name = localStorage.getItem('appName') || 'Nexia';
-  const msg = `💞 Vamos conversar juntos na *${name}*!\n\nUse o código da sala: *${scRoomId}*\n👉 ${window.location.origin}`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  const name = localStorage.getItem('appName')||'Nexia';
+  const msg = `💞 Vamos conversar com a *${name}* juntos!\n\nCódigo da sala: *${scRoomId}*\n👉 Acesse: ${window.location.origin}\nClica em "💞 Chat Compartilhado" e entra com o código!`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`,'_blank');
 }
 
-function leaveSharedRoom(){
+async function leaveSharedRoom(){
   if(scPollInterval) clearInterval(scPollInterval);
-  scRoomId = null; scLastMsg = 0;
+  if(scRoomId) await fetch(`/api/shared-room/${scRoomId}/leave`,{method:'DELETE'}).catch(()=>{});
+  scRoomId=null; scLastTs=0; scAllMessages=[];
   localStorage.removeItem('scRoomId');
-  document.getElementById('scNoRoom').style.display='';
-  document.getElementById('scRoom').style.display='none';
-  document.getElementById('scMessages').innerHTML = '';
+  document.getElementById('sharedChatRoom').style.display='none';
+  document.getElementById('joinRoomCode').value='';
   toast('Você saiu da sala.','ok');
 }
 
