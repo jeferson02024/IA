@@ -636,11 +636,14 @@ app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
     if (msgLimitPerDay!==undefined) await upsert('msgLimitPerDay', String(msgLimitPerDay||0));
     if (maxTokens!==undefined) await upsert('maxTokens', String(maxTokens||1024));
     // Banner & controls
-    const {bannerText,bannerType,maintenance,allowRegistration} = req.body;
+    const {bannerText,bannerType,maintenance,allowRegistration,supportPhone,supportMsg,supportChatUrl} = req.body;
     if (bannerText!==undefined) await upsert('bannerText', bannerText);
     if (bannerType!==undefined) await upsert('bannerType', bannerType);
     if (maintenance!==undefined) await upsert('maintenance', String(maintenance));
     if (allowRegistration!==undefined) await upsert('allowRegistration', String(allowRegistration));
+    if (supportPhone!==undefined) await upsert('supportPhone', supportPhone);
+    if (supportMsg!==undefined) await upsert('supportMsg', supportMsg);
+    if (supportChatUrl!==undefined) await upsert('supportChatUrl', supportChatUrl);
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -1178,7 +1181,7 @@ app.post('/api/admin/force-logout-all', auth, role('creator'), async (req,res) =
 // Banner & maintenance: served via /api/app-config (public)
 app.get('/api/app-config', async (req,res) => {
   try{
-    const r = await q("SELECT key,value FROM config WHERE key IN ('bannerText','bannerType','maintenance','allowRegistration','systemPrompt','aiName','welcomeMsg','personalityMode','msgLimitPerDay','maxTokens')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('bannerText','bannerType','maintenance','allowRegistration','systemPrompt','aiName','welcomeMsg','personalityMode','msgLimitPerDay','maxTokens','supportPhone','supportMsg','supportChatUrl')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key] = row.value);
     res.json({
@@ -1191,7 +1194,10 @@ app.get('/api/app-config', async (req,res) => {
       personalityMode: cfg.personalityMode||'padrao',
       systemPrompt: cfg.systemPrompt||'',
       msgLimitPerDay: parseInt(cfg.msgLimitPerDay)||0,
-      maxTokens: parseInt(cfg.maxTokens)||1024
+      maxTokens: parseInt(cfg.maxTokens)||1024,
+      supportPhone: cfg.supportPhone||'',
+      supportMsg: cfg.supportMsg||'Olá! Preciso de ajuda com o Nexia.',
+      supportChatUrl: cfg.supportChatUrl||''
     });
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
