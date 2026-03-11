@@ -319,7 +319,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 <!-- Shared Chat Full Screen -->
 <div id="sharedChatRoom" style="display:none;position:fixed;inset:0;z-index:500;background:var(--bg);flex-direction:column">
   <!-- Header -->
-  <div style="background:var(--sidebar);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+  <div style="background:var(--sidebar);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap">
     <img src="/logo.png" style="width:32px;height:32px;border-radius:8px;object-fit:cover">
     <div style="flex:1;min-width:0">
       <div style="font-size:14px;font-weight:600;color:var(--text)">Nexia — Chat Compartilhado</div>
@@ -328,6 +328,24 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
     <button onclick="copyRoomCode()" style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);border-radius:8px;padding:6px 12px;color:#c084fc;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap">📋 Código</button>
     <button onclick="shareRoomWhatsApp()" style="background:#25d366;border:none;border-radius:8px;padding:6px 12px;color:#fff;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📲 Convidar</button>
     <button onclick="leaveSharedRoom()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:6px 12px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">Sair</button>
+  </div>
+
+  <!-- Provider selector bar -->
+  <div style="background:var(--sidebar);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0;overflow-x:auto">
+    <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">Provedor:</span>
+    <button id="scBtnGroq" onclick="scSetProvider('groq')" style="display:flex;align-items:center;gap:6px;background:rgba(25,195,125,.15);border:1px solid rgba(25,195,125,.3);border-radius:20px;padding:5px 12px;color:#19c37d;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">
+      <div style="width:7px;height:7px;border-radius:50%;background:#19c37d;flex-shrink:0"></div>Groq
+    </button>
+    <button id="scBtnGemini" onclick="scSetProvider('gemini')" style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0">
+      <div style="width:7px;height:7px;border-radius:50%;background:#4f8ef7;flex-shrink:0"></div>Gemini
+    </button>
+    <button id="scBtnMistral" onclick="scSetProvider('mistral')" style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0">
+      <div style="width:7px;height:7px;border-radius:50%;background:#ff7000;flex-shrink:0"></div>Mistral
+    </button>
+    <button id="scBtnOpenrouter" onclick="scSetProvider('openrouter')" style="display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0">
+      <div style="width:7px;height:7px;border-radius:50%;background:#7c3aed;flex-shrink:0"></div>Nexia
+    </button>
+    <select id="scModelSelect" onchange="scModel=this.value" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none;margin-left:4px;flex-shrink:0"></select>
   </div>
 
   <!-- Participants bar -->
@@ -1046,6 +1064,33 @@ function shareWhatsApp(){
 
 // ===== SHARED CHAT ROOM =====
 let scRoomId = null, scPollInterval = null, scLastTs = 0, scAllMessages = [];
+let scProvider = 'groq', scModel = 'llama-3.3-70b-versatile';
+
+const scModels = {
+  groq: ['llama-3.3-70b-versatile','llama-3.1-8b-instant','llama-3.2-90b-vision-preview'],
+  gemini: ['gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-pro'],
+  mistral: ['mistral-large-latest','mistral-small-latest','codestral-latest'],
+  openrouter: ['openrouter/auto','meta-llama/llama-3.3-70b-instruct:free','google/gemma-3-27b-it:free']
+};
+
+function scSetProvider(p){
+  scProvider = p;
+  const defaults = { groq:'llama-3.3-70b-versatile', gemini:'gemini-2.0-flash', mistral:'mistral-large-latest', openrouter:'openrouter/auto' };
+  scModel = defaults[p];
+  // Update buttons
+  ['groq','gemini','mistral','openrouter'].forEach(name => {
+    const btn = document.getElementById('scBtn'+name.charAt(0).toUpperCase()+name.slice(1));
+    if(!btn) return;
+    const colors = {groq:'rgba(25,195,125,.15),rgba(25,195,125,.3),#19c37d', gemini:'rgba(79,142,247,.15),rgba(79,142,247,.3),#4f8ef7', mistral:'rgba(255,112,0,.15),rgba(255,112,0,.3),#ff7000', openrouter:'rgba(124,58,237,.15),rgba(124,58,237,.3),#c084fc'};
+    const [bg,border,color] = colors[name].split(',');
+    if(name===p){ btn.style.background=bg; btn.style.borderColor=border; btn.style.color=color; }
+    else { btn.style.background='var(--surface)'; btn.style.borderColor='var(--border)'; btn.style.color='var(--muted)'; }
+  });
+  // Update model select
+  const sel = document.getElementById('scModelSelect');
+  sel.innerHTML = scModels[p].map(m=>`<option value="${m}">${m.replace('openrouter/','').replace(':free',' (free)')}</option>`).join('');
+  sel.value = scModel;
+}
 
 function openSharedChat(){
   const saved = localStorage.getItem('scRoomId');
@@ -1085,6 +1130,7 @@ function enterRoom(code){
   document.getElementById('scRoomCodeDisplay').textContent = code;
   document.getElementById('scMessages').innerHTML = '';
   document.getElementById('sharedChatRoom').style.display = 'flex';
+  scSetProvider('groq'); // init provider bar
   document.getElementById('scInput').focus();
   loadScMessages(true);
   if(scPollInterval) clearInterval(scPollInterval);
@@ -1171,7 +1217,7 @@ async function sendSharedMsg(){
   input.value = ''; input.style.height = 'auto';
   document.getElementById('scTyping').style.display = 'block';
   try{
-    const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const r = await fetch(`/api/shared-room/${scRoomId}/messages`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text, provider: scProvider, model: scModel})});
     const d = await r.json();
     if(!r.ok){ toast(d.error||'Erro.','err'); return; }
     if(d.msg){ scAllMessages.push(d.msg); appendScMessage(d.msg); scLastTs = d.msg.ts; }
