@@ -403,6 +403,7 @@ app.post('/api/chat', auth, async (req,res) => {
       reply = await tryWithFallback(provider, apiKey, callFn, usedModel, messages, systemPrompt);
     }
     recordResponseTime(provider, Date.now() - chatStart);
+    if (conversationId) {
       const cr = await q('SELECT * FROM conversations WHERE id=$1 AND user_id=$2', [conversationId, req.user.id]);
       if (cr.rows.length) {
         const conv = cr.rows[0];
