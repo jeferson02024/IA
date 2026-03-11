@@ -94,6 +94,14 @@ async function initDB() {
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
+  await q(`CREATE TABLE IF NOT EXISTS shared_rooms (
+    code TEXT PRIMARY KEY,
+    created_by TEXT NOT NULL,
+    participants TEXT NOT NULL DEFAULT '[]',
+    messages TEXT NOT NULL DEFAULT '[]',
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+  )`);
   await q(`CREATE TABLE IF NOT EXISTS conversations (
     id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL,
     title TEXT NOT NULL DEFAULT 'Nova conversa', provider TEXT NOT NULL DEFAULT 'groq',
@@ -151,6 +159,9 @@ app.post('/api/register', async (req,res) => {
     const {email,password} = req.body;
     if (!email||!password) return res.status(400).json({ error:'Email e senha obrigatórios.' });
     if (password.length<6) return res.status(400).json({ error:'Senha mínima: 6 caracteres.' });
+    // Check if registration is blocked
+    const regCfg = await q("SELECT value FROM config WHERE key='allowRegistration'");
+    if (regCfg.rows[0]?.value === 'false') return res.status(403).json({ error:'Cadastro de novos usuários está temporariamente desativado.' });
     const ex = await q('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
     if (ex.rows.length) return res.status(400).json({ error:'Email já cadastrado.' });
     const r = await q('INSERT INTO users (email,password,role) VALUES ($1,$2,$3) RETURNING *', [email.toLowerCase(), bcrypt.hashSync(password,10), 'user']);
@@ -166,6 +177,9 @@ app.post('/api/login', async (req,res) => {
     const r = await q('SELECT * FROM users WHERE email=$1', [(email||'').toLowerCase()]);
     const user = r.rows[0];
     if (!user||!bcrypt.compareSync(password,user.password)) return res.status(401).json({ error:'Email ou senha incorretos.' });
+    // Log login
+    loginLog.push({ email: user.email, role: user.role, ts: Date.now() });
+    if (loginLog.length > 100) loginLog.shift();
     res.cookie('token', signToken(user), { httpOnly:true, maxAge:7*24*60*60*1000 });
     res.json({ ok:true, user:{ email:user.email, role:user.role } });
   } catch(e) { res.status(500).json({ error:e.message }); }
@@ -312,14 +326,20 @@ app.delete('/api/conversations/:id', auth, async (req,res) => {
 
 app.post('/api/chat', auth, async (req,res) => {
   try {
-    const {messages: rawMessages, systemPrompt, provider, model, conversationId} = req.body;
+    const {messages: rawMessages, systemPrompt: clientSystemPrompt, provider, model, conversationId} = req.body;
     if (!provider) return res.status(400).json({ error:'Provedor não informado.' });
     console.log('[chat] provider:', provider, 'msgs:', (rawMessages||[]).length);
 
-    // Sanitize messages: convert array content (image+text) to string only
+    // Load global systemPrompt from DB (personality setting)
+    let systemPrompt = clientSystemPrompt;
+    if (!systemPrompt) {
+      const sp = await q("SELECT value FROM config WHERE key='systemPrompt'");
+      systemPrompt = sp.rows[0]?.value || null;
+    }
+
+    // Sanitize messages
     const messages = (rawMessages||[]).map(m => {
       if (Array.isArray(m.content)) {
-        // Extract text parts only for providers that don't support vision in history
         const textParts = m.content.filter(p => p.type === 'text').map(p => p.text).join(' ');
         return { ...m, content: textParts || '[imagem]' };
       }
@@ -550,7 +570,7 @@ app.get('/api/admin/stats', auth, role('creator','admin'), async (req,res) => {
 
 app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
   try {
-    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key','theme_accent','theme_bg','theme_sidebar','theme_surface','cf_account_id','cf_api_token')");
+    const r = await q("SELECT key,value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_groq_model','global_gemini_model','global_mistral_key','global_mistral_model','global_openrouter_key','global_together_key','theme_accent','theme_bg','theme_sidebar','theme_surface','cf_account_id','cf_api_token','personalityMode','systemPrompt','customPrompt','aiName','welcomeMsg','msgLimitPerDay','maxTokens','bannerText','bannerType','maintenance','allowRegistration')");
     const cfg = {};
     r.rows.forEach(row => cfg[row.key]=row.value);
     res.json({
@@ -562,30 +582,54 @@ app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
       theme: { accent: cfg.theme_accent||'#19c37d', bg: cfg.theme_bg||'#0f0f0f', sidebar: cfg.theme_sidebar||'#171717', surface: cfg.theme_surface||'#1e1e1e' },
       hasCfToken: !!cfg.cf_api_token, cfTokenMasked: cfg.cf_api_token?cfg.cf_api_token.slice(0,8)+'••••':null,
       hasCfAccount: !!cfg.cf_account_id,
+      personalityMode: cfg.personalityMode||'padrao',
+      systemPrompt: cfg.systemPrompt||'',
+      customPrompt: cfg.customPrompt||'',
+      aiName: cfg.aiName||'Nexia',
+      welcomeMsg: cfg.welcomeMsg||'',
+      msgLimitPerDay: parseInt(cfg.msgLimitPerDay)||0,
+      maxTokens: parseInt(cfg.maxTokens)||1024,
+      bannerText: cfg.bannerText||'',
+      bannerType: cfg.bannerType||'',
+      maintenance: cfg.maintenance==='true',
+      allowRegistration: cfg.allowRegistration!=='false',
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.post('/api/admin/config', auth, role('creator'), async (req,res) => {
   try {
-    const {groqKey,geminiKey,groqModel,geminiModel} = req.body;
     const upsert = (k,v) => q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2', [k,v]);
+    const {groqKey,geminiKey,groqModel,geminiModel,mistralKey,mistralModel,openrouterKey,togetherKey,cfAccountId,cfApiToken,accentColor,bgColor,sidebarColor,surfaceColor} = req.body;
     if (groqKey) await upsert('global_groq_key', groqKey);
     if (geminiKey) await upsert('global_gemini_key', geminiKey);
     if (groqModel) await upsert('global_groq_model', groqModel);
     if (geminiModel) await upsert('global_gemini_model', geminiModel);
-    const {mistralKey, mistralModel, openrouterKey, togetherKey, cfAccountId, cfApiToken} = req.body;
     if (mistralKey) await upsert('global_mistral_key', mistralKey);
     if (mistralModel) await upsert('global_mistral_model', mistralModel);
     if (openrouterKey) await upsert('global_openrouter_key', openrouterKey);
     if (togetherKey) await upsert('global_together_key', togetherKey);
     if (cfAccountId) await upsert('cf_account_id', cfAccountId);
     if (cfApiToken) await upsert('cf_api_token', cfApiToken);
-    const {accentColor, bgColor, sidebarColor, surfaceColor} = req.body;
     if (accentColor) await upsert('theme_accent', accentColor);
     if (bgColor) await upsert('theme_bg', bgColor);
     if (sidebarColor) await upsert('theme_sidebar', sidebarColor);
     if (surfaceColor) await upsert('theme_surface', surfaceColor);
+    // Personality
+    const {personalityMode,systemPrompt,customPrompt,aiName,welcomeMsg,msgLimitPerDay,maxTokens} = req.body;
+    if (personalityMode!==undefined) await upsert('personalityMode', personalityMode);
+    if (systemPrompt!==undefined) await upsert('systemPrompt', systemPrompt);
+    if (customPrompt!==undefined) await upsert('customPrompt', customPrompt);
+    if (aiName!==undefined) await upsert('aiName', aiName||'Nexia');
+    if (welcomeMsg!==undefined) await upsert('welcomeMsg', welcomeMsg);
+    if (msgLimitPerDay!==undefined) await upsert('msgLimitPerDay', String(msgLimitPerDay||0));
+    if (maxTokens!==undefined) await upsert('maxTokens', String(maxTokens||1024));
+    // Banner & controls
+    const {bannerText,bannerType,maintenance,allowRegistration} = req.body;
+    if (bannerText!==undefined) await upsert('bannerText', bannerText);
+    if (bannerType!==undefined) await upsert('bannerType', bannerType);
+    if (maintenance!==undefined) await upsert('maintenance', String(maintenance));
+    if (allowRegistration!==undefined) await upsert('allowRegistration', String(allowRegistration));
     res.json({ ok:true });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -795,37 +839,38 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
 });
 
-// ===== SHARED ROOMS (até 8 pessoas, com IA) =====
-const sharedRooms = new Map();
-// room: { code, createdBy, participants:[{email,joinedAt}], messages:[{id,email,role,content,ts}], createdAt }
-
+// ===== SHARED ROOMS — persistido no PostgreSQL =====
 function genCode(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
 
-// Criar sala
+// Criar ou entrar na sala
 app.post('/api/shared-room', auth, async (req,res) => {
   try{
     const { action, code } = req.body;
     const email = req.user.email;
+
     if(action === 'create'){
       const newCode = genCode();
-      sharedRooms.set(newCode, {
-        code: newCode,
-        createdBy: email,
-        participants: [{ email, joinedAt: Date.now() }],
-        messages: [],
-        createdAt: Date.now()
-      });
+      await q(`INSERT INTO shared_rooms (code, created_by, participants, messages, created_at, updated_at)
+               VALUES ($1,$2,$3,$4,$5,$5)`,
+        [newCode, email, JSON.stringify([{email, joinedAt: Date.now()}]), '[]', Date.now()]);
       return res.json({ code: newCode });
     }
+
     if(action === 'join'){
-      const room = sharedRooms.get(code);
-      if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
-      if(room.participants.length >= 8 && !room.participants.find(p=>p.email===email))
+      const r = await q('SELECT * FROM shared_rooms WHERE code=$1', [code]);
+      if(!r.rows.length) return res.status(404).json({ error: 'Sala não encontrada.' });
+      const room = r.rows[0];
+      const participants = JSON.parse(room.participants);
+      if(participants.length >= 8 && !participants.find(p=>p.email===email))
         return res.status(400).json({ error: 'Sala cheia (máx 8 pessoas).' });
-      if(!room.participants.find(p=>p.email===email))
-        room.participants.push({ email, joinedAt: Date.now() });
+      if(!participants.find(p=>p.email===email)){
+        participants.push({ email, joinedAt: Date.now() });
+        await q('UPDATE shared_rooms SET participants=$1, updated_at=$2 WHERE code=$3',
+          [JSON.stringify(participants), Date.now(), code]);
+      }
       return res.json({ ok: true, code });
     }
+
     res.status(400).json({ error: 'Ação inválida.' });
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
@@ -833,19 +878,28 @@ app.post('/api/shared-room', auth, async (req,res) => {
 // Buscar mensagens (polling)
 app.get('/api/shared-room/:code/messages', auth, async (req,res) => {
   try{
-    const room = sharedRooms.get(req.params.code);
-    if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const r = await q('SELECT * FROM shared_rooms WHERE code=$1', [req.params.code]);
+    if(!r.rows.length) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const room = r.rows[0];
+    const participants = JSON.parse(room.participants);
+    const messages = JSON.parse(room.messages);
     const email = req.user.email;
-    if(!room.participants.find(p=>p.email===email))
-      room.participants.push({ email, joinedAt: Date.now() });
+
+    // Auto-join if not already in
+    if(!participants.find(p=>p.email===email)){
+      participants.push({ email, joinedAt: Date.now() });
+      await q('UPDATE shared_rooms SET participants=$1, updated_at=$2 WHERE code=$3',
+        [JSON.stringify(participants), Date.now(), req.params.code]);
+    }
+
     const since = parseInt(req.query.since||'0');
-    const newMsgs = room.messages.filter(m=>m.ts > since);
+    const newMsgs = messages.filter(m => m.ts > since);
     res.json({
       messages: newMsgs,
-      allMessages: room.messages.slice(-100),
-      participants: room.participants,
+      allMessages: messages.slice(-100),
+      participants,
       code: room.code,
-      createdBy: room.createdBy
+      createdBy: room.created_by
     });
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
@@ -853,107 +907,177 @@ app.get('/api/shared-room/:code/messages', auth, async (req,res) => {
 // Enviar mensagem + chamar IA
 app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
   try{
-    const room = sharedRooms.get(req.params.code);
-    if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const r = await q('SELECT * FROM shared_rooms WHERE code=$1', [req.params.code]);
+    if(!r.rows.length) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const room = r.rows[0];
     const { text, provider, model, displayName, photo } = req.body;
     if(!text) return res.status(400).json({ error: 'Texto vazio.' });
 
-    // Add user message with profile info
+    const messages = JSON.parse(room.messages);
+    const participants = JSON.parse(room.participants);
     const userMsg = { id: Date.now(), email: req.user.email, role: 'user', content: text, ts: Date.now(), displayName: displayName||null, photo: photo||null };
-    room.messages.push(userMsg);
+    messages.push(userMsg);
+    // Keep max 500 messages
+    const trimmed = messages.slice(-500);
+    await q('UPDATE shared_rooms SET messages=$1, updated_at=$2 WHERE code=$3',
+      [JSON.stringify(trimmed), Date.now(), req.params.code]);
     res.json({ ok: true, msg: userMsg });
 
     // Call AI in background
-    try {
-      const { provider, model } = req.body;
-      const cfg = await q("SELECT key, value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_mistral_key','global_openrouter_key','global_groq_model','global_gemini_model','global_mistral_model')");
-      const cfgMap = {};
-      cfg.rows.forEach(r => cfgMap[r.key] = r.value);
+    (async () => {
+      try{
+        const cfg = await q("SELECT key, value FROM config WHERE key IN ('global_groq_key','global_gemini_key','global_mistral_key','global_openrouter_key','systemPrompt')");
+        const cfgMap = {};
+        cfg.rows.forEach(row => cfgMap[row.key] = row.value);
 
-      let aiText = '';
+        const history = trimmed.slice(-20)
+          .filter(m => m.role==='user'||m.role==='assistant')
+          .map(m => ({ role: m.role, content: typeof m.content==='string'?m.content:JSON.stringify(m.content) }));
 
-      const history = room.messages.slice(-20)
-        .filter(m=>m.role==='user'||m.role==='assistant')
-        .map(m=>({ role: m.role, content: typeof m.content==='string'?m.content:JSON.stringify(m.content) }));
+        const globalSysPrompt = cfgMap['systemPrompt'];
+        const systemPrompt = globalSysPrompt
+          || `Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${participants.length} pessoas. Responda sempre em português. Se pedirem imagem use: ##IMG## descrição em inglês ##ENDIMG##`;
 
-      const systemPrompt = `Você é Nexia, assistente de IA. Esta é uma sala compartilhada com ${room.participants.length} pessoas. Responda sempre em português. Se o usuário pedir para gerar imagem, responda: ##IMG## descrição em inglês ##ENDIMG##`;
+        const selectedProvider = provider || 'groq';
+        const selectedModel = model || 'llama-3.3-70b-versatile';
+        let aiText = '';
 
-      const selectedProvider = provider || 'groq';
-      const selectedModel = model || cfgMap[`global_${selectedProvider}_model`] || 'llama-3.3-70b-versatile';
+        if(selectedProvider === 'groq'){
+          const key = cfgMap['global_groq_key']; if(!key) return;
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+          if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+        } else if(selectedProvider === 'gemini'){
+          const key = cfgMap['global_gemini_key']; if(!key) return;
+          const contents = history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel||'gemini-2.0-flash'}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:1024}}),signal:AbortSignal.timeout(30000)});
+          if(!res.ok) return; const data = await res.json(); aiText = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        } else if(selectedProvider === 'mistral'){
+          const key = cfgMap['global_mistral_key']; if(!key) return;
+          const res = await fetch('https://api.mistral.ai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel||'mistral-large-latest',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+          if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+        } else if(selectedProvider === 'openrouter'){
+          const key = cfgMap['global_openrouter_key']; if(!key) return;
+          const res = await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json','HTTP-Referer':'https://ia-2-uvqg.onrender.com'},body:JSON.stringify({model:selectedModel||'openrouter/auto',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
+          if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
+        }
 
-      if(selectedProvider === 'groq'){
-        const key = cfgMap['global_groq_key']; if(!key) return;
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
-        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
-      } else if(selectedProvider === 'gemini'){
-        const key = cfgMap['global_gemini_key']; if(!key) return;
-        const gModel = selectedModel||'gemini-2.0-flash';
-        const contents = history.map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]}));
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${gModel}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents,generationConfig:{maxOutputTokens:1024}}),signal:AbortSignal.timeout(30000)});
-        if(!res.ok) return; const data = await res.json(); aiText = data.candidates?.[0]?.content?.parts?.[0]?.text||'';
-      } else if(selectedProvider === 'mistral'){
-        const key = cfgMap['global_mistral_key']; if(!key) return;
-        const res = await fetch('https://api.mistral.ai/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel||'mistral-large-latest',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
-        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
-      } else if(selectedProvider === 'openrouter'){
-        const key = cfgMap['global_openrouter_key']; if(!key) return;
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json','HTTP-Referer':'https://ia-2-uvqg.onrender.com'},body:JSON.stringify({model:selectedModel||'openrouter/auto',messages:[{role:'system',content:systemPrompt},...history],max_tokens:1024}),signal:AbortSignal.timeout(30000)});
-        if(!res.ok) return; const data = await res.json(); aiText = data.choices?.[0]?.message?.content||'';
-      }
+        if(!aiText) return;
+        // Re-fetch latest messages to avoid race condition
+        const latest = await q('SELECT messages FROM shared_rooms WHERE code=$1', [req.params.code]);
+        if(!latest.rows.length) return;
+        const latestMsgs = JSON.parse(latest.rows[0].messages);
+        const aiMsg = { id: Date.now()+1, email: 'Nexia', role: 'assistant', content: aiText, ts: Date.now() };
+        latestMsgs.push(aiMsg);
+        await q('UPDATE shared_rooms SET messages=$1, updated_at=$2 WHERE code=$3',
+          [JSON.stringify(latestMsgs.slice(-500)), Date.now(), req.params.code]);
+      }catch(e){ console.error('AI shared room error:', e.message); }
+    })();
 
-      if(!aiText) return;
-      const aiMsg = { id: Date.now()+1, email: 'Nexia', role: 'assistant', content: aiText, ts: Date.now() };
-      room.messages.push(aiMsg);
-      if(room.messages.length > 500) room.messages = room.messages.slice(-500);
-    } catch(e){ console.error('AI error in shared room:', e.message); }
   }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
 // Sair da sala
-app.delete('/api/shared-room/:code/leave', auth, (req,res) => {
-  const room = sharedRooms.get(req.params.code);
-  if(!room) return res.json({ ok: true });
-  room.participants = room.participants.filter(p=>p.email!==req.user.email);
-  if(room.participants.length === 0) sharedRooms.delete(req.params.code);
-  res.json({ ok: true });
+app.delete('/api/shared-room/:code/leave', auth, async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM shared_rooms WHERE code=$1', [req.params.code]);
+    if(!r.rows.length) return res.json({ ok: true });
+    const participants = JSON.parse(r.rows[0].participants).filter(p=>p.email!==req.user.email);
+    if(participants.length === 0){
+      await q('DELETE FROM shared_rooms WHERE code=$1', [req.params.code]);
+    } else {
+      await q('UPDATE shared_rooms SET participants=$1, updated_at=$2 WHERE code=$3',
+        [JSON.stringify(participants), Date.now(), req.params.code]);
+    }
+    res.json({ ok: true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
 // Admin - listar salas
-app.get('/api/admin/shared-rooms', auth, role('creator','admin'), (req,res) => {
-  const now = Date.now();
-  const rooms = [];
-  sharedRooms.forEach((room, code) => {
-    const ageMs = now - room.createdAt;
-    const ageStr = ageMs < 60000 ? 'agora mesmo'
-      : ageMs < 3600000 ? `há ${Math.floor(ageMs/60000)}min`
-      : `há ${Math.floor(ageMs/3600000)}h`;
-    rooms.push({
-      code,
-      createdBy: room.createdBy,
-      participants: room.participants.length,
-      participantList: room.participants.map(p=>p.email),
-      messageCount: room.messages.length,
-      age: ageStr,
-      createdAt: room.createdAt
+app.get('/api/admin/shared-rooms', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM shared_rooms ORDER BY created_at DESC');
+    const now = Date.now();
+    const rooms = r.rows.map(room => {
+      const participants = JSON.parse(room.participants);
+      const messages = JSON.parse(room.messages);
+      const ageMs = now - room.created_at;
+      const ageStr = ageMs < 60000 ? 'agora mesmo'
+        : ageMs < 3600000 ? `há ${Math.floor(ageMs/60000)}min`
+        : `há ${Math.floor(ageMs/3600000)}h`;
+      return {
+        code: room.code,
+        createdBy: room.created_by,
+        participants: participants.length,
+        participantList: participants.map(p=>p.email),
+        messageCount: messages.length,
+        age: ageStr,
+        createdAt: room.created_at
+      };
     });
-  });
-  res.json(rooms.sort((a,b)=>b.createdAt-a.createdAt));
+    res.json(rooms);
+  }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
 // Admin - encerrar sala
-app.delete('/api/admin/shared-rooms/:code', auth, role('creator','admin'), (req,res) => {
-  sharedRooms.delete(req.params.code);
-  res.json({ ok: true });
+app.delete('/api/admin/shared-rooms/:code', auth, role('creator','admin'), async (req,res) => {
+  try{
+    await q('DELETE FROM shared_rooms WHERE code=$1', [req.params.code]);
+    res.json({ ok: true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
 // Admin - ver mensagens de uma sala
-app.get('/api/admin/shared-rooms/:code/messages', auth, role('creator','admin'), (req,res) => {
-  const room = sharedRooms.get(req.params.code);
-  if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
-  res.json({ messages: room.messages.slice(-50), participants: room.participants });
+app.get('/api/admin/shared-rooms/:code/messages', auth, role('creator','admin'), async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM shared_rooms WHERE code=$1', [req.params.code]);
+    if(!r.rows.length) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const messages = JSON.parse(r.rows[0].messages);
+    const participants = JSON.parse(r.rows[0].participants);
+    res.json({ messages: messages.slice(-50), participants });
+  }catch(e){ res.status(500).json({ error: e.message }); }
 });
 
-// Logo upload route
+// Login log (in-memory, last 100)
+const loginLog = [];
+
+// Override the /api/me to also log logins — patch after auth routes
+// We'll log on /api/login instead
+// Already handled below by patching login route
+
+// Admin: login log
+app.get('/api/admin/login-log', auth, role('creator','admin'), (req,res) => {
+  res.json(loginLog.slice(-50).reverse());
+});
+
+// Admin: force logout all (increment JWT version in config)
+app.post('/api/admin/force-logout-all', auth, role('creator'), async (req,res) => {
+  try{
+    const newV = Date.now();
+    await q('INSERT INTO config (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2', ['jwt_version', String(newV)]);
+    res.json({ ok: true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+// Banner & maintenance: served via /api/app-config (public)
+app.get('/api/app-config', async (req,res) => {
+  try{
+    const r = await q("SELECT key,value FROM config WHERE key IN ('bannerText','bannerType','maintenance','allowRegistration','systemPrompt','aiName','welcomeMsg','personalityMode','msgLimitPerDay','maxTokens')");
+    const cfg = {};
+    r.rows.forEach(row => cfg[row.key] = row.value);
+    res.json({
+      bannerText: cfg.bannerText||'',
+      bannerType: cfg.bannerType||'',
+      maintenance: cfg.maintenance==='true',
+      allowRegistration: cfg.allowRegistration!=='false',
+      aiName: cfg.aiName||'Nexia',
+      welcomeMsg: cfg.welcomeMsg||'',
+      personalityMode: cfg.personalityMode||'padrao',
+      systemPrompt: cfg.systemPrompt||'',
+      msgLimitPerDay: parseInt(cfg.msgLimitPerDay)||0,
+      maxTokens: parseInt(cfg.maxTokens)||1024
+    });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
 app.post('/api/admin/logo', auth, role('creator','admin'), async (req,res) => {
   try {
     const chunks = [];
