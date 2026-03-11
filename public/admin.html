@@ -197,6 +197,9 @@ input::placeholder{color:var(--muted)}
   <div class="mob-nav-item" onclick="showTab('branding');closeDrawer()" id="mbnBranding" style="display:none">
     <span class="mob-nav-icon">🖼️</span><span>Personalizar App</span>
   </div>
+  <div class="mob-nav-item" onclick="showTab('sharedrooms');closeDrawer()" id="mbnSharedRooms" style="display:none">
+    <span class="mob-nav-icon">💞</span><span>Chats Compartilhados</span>
+  </div>
   <div class="mob-nav-item" onclick="showTab('database');closeDrawer()" id="mbnDatabase" style="display:none">
     <span class="mob-nav-icon">🗄️</span><span>Banco de Dados</span>
   </div>
@@ -231,6 +234,9 @@ input::placeholder{color:var(--muted)}
     </div>
     <div class="nav-item" onclick="showTab('branding')" id="navBranding" style="display:none">
       <span class="nav-icon">🖼️</span><span>Personalizar App</span>
+    </div>
+    <div class="nav-item" onclick="showTab('sharedrooms')" id="navSharedRooms" style="display:none">
+      <span class="nav-icon">💞</span><span>Chats Compartilhados</span>
     </div>
     <div class="nav-item" onclick="showTab('database')" id="navDatabase" style="display:none">
       <span class="nav-icon">🗄️</span><span>Banco de Dados</span>
@@ -514,6 +520,19 @@ input::placeholder{color:var(--muted)}
       </div>
     </div>
 
+    <!-- CHATS COMPARTILHADOS -->
+    <div class="tab-page" id="tab-sharedrooms">
+      <div class="page-title">💞 Chats Compartilhados</div>
+      <div class="page-sub">Veja todas as salas de chat compartilhado ativas na plataforma.</div>
+      <div class="section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="section-title" style="margin-bottom:0">Salas ativas</div>
+          <button onclick="loadSharedRooms()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer">🔄 Atualizar</button>
+        </div>
+        <div id="sharedRoomsList"><div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Carregando...</div></div>
+      </div>
+    </div>
+
     <!-- BANCO DE DADOS -->
     <div class="tab-page" id="tab-database">
       <div class="page-title">🗄️ Banco de Dados</div>
@@ -589,6 +608,7 @@ function showTab(name) {
   if (name==='database') loadDbInfo();
   if (name==='backup') loadBackupKeys();
   if (name==='users') loadUsers();
+  if (name==='sharedrooms') loadSharedRooms();
 }
 
 async function init() {
@@ -605,16 +625,22 @@ async function init() {
   badge.textContent = me.role==='creator'?'👑 Criador':'🛡 Admin';
   badge.className = `badge ${me.role}`;
   if (me.role==='creator') {
-    ['mbnApikeys','mbnBackup','mbnTheme','mbnBranding','mbnDatabase'].forEach(id=>{
+    ['mbnApikeys','mbnBackup','mbnTheme','mbnBranding','mbnSharedRooms','mbnDatabase'].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.style.display='flex';
     });
     const lbl = document.getElementById('mbnLabelConfig');
     if(lbl) lbl.style.display='block';
-    ['navLabelConfig','navApikeys','navBackup','navTheme','navBranding','navDatabase'].forEach(id=>{
+    ['navLabelConfig','navApikeys','navBackup','navTheme','navBranding','navSharedRooms','navDatabase'].forEach(id=>{
       document.getElementById(id).style.display='';
     });
     loadConfig();
+  } else {
+    // admins can see shared rooms too
+    const el = document.getElementById('mbnSharedRooms');
+    if(el) el.style.display='flex';
+    const el2 = document.getElementById('navSharedRooms');
+    if(el2) el2.style.display='';
   }
   loadStats();
   loadUsers();
@@ -854,6 +880,37 @@ async function uploadLogo(){
     document.getElementById('logoFile').value = '';
     toast('✅ Logo atualizado com sucesso!', 'ok');
   }catch(e){ toast('Erro ao enviar logo.', 'err'); }
+}
+
+// ===== SHARED ROOMS =====
+async function loadSharedRooms(){
+  try{
+    const r = await fetch('/api/admin/shared-rooms');
+    if(!r.ok){ document.getElementById('sharedRoomsList').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Erro ao carregar.</div>'; return; }
+    const rooms = await r.json();
+    const el = document.getElementById('sharedRoomsList');
+    if(!rooms.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Nenhuma sala ativa no momento.</div>'; return; }
+    el.innerHTML = rooms.map(room => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:16px;font-weight:700;color:#c084fc;letter-spacing:2px">${room.code}</span>
+          <span style="font-size:11px;color:var(--muted)">${room.age}</span>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
+          <span>👥 ${room.participants} participante(s)</span>
+          <span>💬 ${room.messageCount} mensagem(s)</span>
+        </div>
+        ${room.participants > 0 ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">${room.participantList.join(' · ')}</div>` : ''}
+        <button onclick="deleteSharedRoom('${room.code}')" style="margin-top:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:4px 12px;color:#fca5a5;font-family:'Inter',sans-serif;font-size:11px;cursor:pointer">🗑 Encerrar sala</button>
+      </div>`).join('');
+  }catch(e){ document.getElementById('sharedRoomsList').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:24px">Erro ao carregar.</div>'; }
+}
+
+async function deleteSharedRoom(code){
+  if(!confirm(`Encerrar sala ${code}?`)) return;
+  const r = await fetch(`/api/admin/shared-rooms/${code}`, {method:'DELETE'});
+  if(r.ok){ toast('Sala encerrada.','ok'); loadSharedRooms(); }
+  else toast('Erro ao encerrar.','err');
 }
 
 async function loadDbInfo(){
