@@ -855,11 +855,11 @@ app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
   try{
     const room = sharedRooms.get(req.params.code);
     if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
-    const { text, provider, model } = req.body;
+    const { text, provider, model, displayName, photo } = req.body;
     if(!text) return res.status(400).json({ error: 'Texto vazio.' });
 
-    // Add user message
-    const userMsg = { id: Date.now(), email: req.user.email, role: 'user', content: text, ts: Date.now() };
+    // Add user message with profile info
+    const userMsg = { id: Date.now(), email: req.user.email, role: 'user', content: text, ts: Date.now(), displayName: displayName||null, photo: photo||null };
     room.messages.push(userMsg);
     res.json({ ok: true, msg: userMsg });
 
