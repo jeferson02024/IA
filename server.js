@@ -795,6 +795,49 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
 });
 
+// Logo upload route
+app.post('/api/admin/logo', auth, role('creator','admin'), async (req,res) => {
+  try {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+      const body = Buffer.concat(chunks);
+      const contentType = req.headers['content-type'] || '';
+      const boundary = contentType.split('boundary=')[1];
+      if (!boundary) return res.status(400).json({ error: 'Requisição inválida.' });
+      const boundaryBuf = Buffer.from('--' + boundary);
+      let start = 0;
+      while (true) {
+        const idx = body.indexOf(boundaryBuf, start);
+        if (idx === -1) break;
+        const end = body.indexOf(boundaryBuf, idx + boundaryBuf.length);
+        if (end === -1) break;
+        const part = body.slice(idx + boundaryBuf.length + 2, end - 2);
+        const headerEnd = part.indexOf('\r\n\r\n');
+        if (headerEnd === -1) { start = end; continue; }
+        const headers = part.slice(0, headerEnd).toString();
+        const content = part.slice(headerEnd + 4);
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        if (!nameMatch || nameMatch[1] !== 'logo') { start = end; continue; }
+        const ctMatch = headers.match(/Content-Type:\s*(\S+)/i);
+        const ct = ctMatch ? ctMatch[1] : 'image/png';
+        if (!['image/png','image/jpeg','image/jpg'].includes(ct)) {
+          return res.status(400).json({ error: 'Apenas PNG/JPG permitido.' });
+        }
+        const ext = ct.includes('png') ? '.png' : '.jpg';
+        const logoPath = path.join(__dirname, 'public', 'logo' + ext);
+        require('fs').writeFileSync(logoPath, content);
+        // If not png, also overwrite logo.png
+        if (ext !== '.png') {
+          require('fs').writeFileSync(path.join(__dirname, 'public', 'logo.png'), content);
+        }
+        return res.json({ ok: true });
+      }
+      res.status(400).json({ error: 'Arquivo não encontrado.' });
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 app.listen(PORT, async () => {
   console.log(`🚀 Nexia rodando na porta ${PORT}`);
