@@ -135,6 +135,22 @@ async function initDB() {
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen BIGINT DEFAULT 0`);
+  await q(`CREATE TABLE IF NOT EXISTS support_tickets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    user_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    channel TEXT NOT NULL DEFAULT 'app',
+    status TEXT NOT NULL DEFAULT 'open',
+    assigned_to INTEGER DEFAULT NULL,
+    assigned_email TEXT DEFAULT NULL,
+    rating INTEGER DEFAULT NULL,
+    rating_comment TEXT DEFAULT NULL,
+    messages JSONB NOT NULL DEFAULT '[]',
+    created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
+    updated_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()),
+    closed_at BIGINT DEFAULT NULL
+  )`);
   console.log('✅ Banco pronto!');
 }
 
@@ -150,6 +166,7 @@ function auth(req,res,next) {
   }
   catch { res.status(401).json({ error:'Sessão expirada.' }); }
 }
+// Roles: creator > subdono > admin > vip > user
 function role(...roles) {
   return (req,res,next) => { if (!roles.includes(req.user.role)) return res.status(403).json({ error:'Acesso negado.' }); next(); };
 }
@@ -1241,6 +1258,136 @@ app.post('/api/admin/logo', auth, role('creator','admin'), async (req,res) => {
       res.status(400).json({ error: 'Arquivo não encontrado.' });
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Public: get support phones (no auth needed)
+app.get('/api/support/phones-public', async (req,res) => {
+  try{
+    const r = await q("SELECT value FROM config WHERE key='supportPhones'");
+    res.json(JSON.parse(r.rows[0]?.value||'[]'));
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// ===== SUPPORT TICKETS =====
+
+// User: open a ticket
+app.post('/api/support/tickets', auth, async (req,res) => {
+  try{
+    const { subject, channel, firstMessage } = req.body;
+    if(!subject||!channel) return res.status(400).json({ error:'subject e channel obrigatórios.' });
+    const msgs = firstMessage ? [{ role:'user', text:firstMessage, email:req.user.email, ts:Date.now() }] : [];
+    const r = await q(
+      `INSERT INTO support_tickets (user_id,user_email,subject,channel,messages) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [req.user.id, req.user.email, subject, channel, JSON.stringify(msgs)]
+    );
+    res.json(r.rows[0]);
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// User: get my tickets
+app.get('/api/support/tickets/mine', auth, async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM support_tickets WHERE user_id=$1 ORDER BY updated_at DESC', [req.user.id]);
+    res.json(r.rows);
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// User: get one ticket (must be owner or support staff)
+app.get('/api/support/tickets/:id', auth, async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM support_tickets WHERE id=$1', [req.params.id]);
+    const t = r.rows[0]; if(!t) return res.status(404).json({ error:'Não encontrado.' });
+    const isStaff = ['creator','subdono','admin'].includes(req.user.role);
+    if(t.user_id !== req.user.id && !isStaff) return res.status(403).json({ error:'Acesso negado.' });
+    res.json(t);
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// User: send message in ticket
+app.post('/api/support/tickets/:id/messages', auth, async (req,res) => {
+  try{
+    const { text } = req.body;
+    if(!text?.trim()) return res.status(400).json({ error:'Mensagem vazia.' });
+    const r = await q('SELECT * FROM support_tickets WHERE id=$1', [req.params.id]);
+    const t = r.rows[0]; if(!t) return res.status(404).json({ error:'Não encontrado.' });
+    const isStaff = ['creator','subdono','admin'].includes(req.user.role);
+    if(t.user_id !== req.user.id && !isStaff) return res.status(403).json({ error:'Acesso negado.' });
+    if(t.status === 'closed') return res.status(400).json({ error:'Ticket encerrado.' });
+    const msgs = Array.isArray(t.messages) ? t.messages : JSON.parse(t.messages||'[]');
+    msgs.push({ role: isStaff ? 'support' : 'user', text: text.trim(), email: req.user.email, ts: Date.now() });
+    const now = Math.floor(Date.now()/1000);
+    await q('UPDATE support_tickets SET messages=$1,updated_at=$2 WHERE id=$3', [JSON.stringify(msgs), now, t.id]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// Staff: list all open tickets
+app.get('/api/support/tickets', auth, role('creator','subdono','admin'), async (req,res) => {
+  try{
+    const status = req.query.status || 'open';
+    const r = await q(`SELECT * FROM support_tickets WHERE status=$1 ORDER BY updated_at DESC`, [status]);
+    res.json(r.rows);
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// Staff: claim a ticket
+app.post('/api/support/tickets/:id/claim', auth, role('creator','subdono','admin'), async (req,res) => {
+  try{
+    const r = await q('SELECT * FROM support_tickets WHERE id=$1', [req.params.id]);
+    const t = r.rows[0]; if(!t) return res.status(404).json({ error:'Não encontrado.' });
+    if(t.assigned_to && t.assigned_to !== req.user.id) return res.status(400).json({ error:'Já atribuído a outro atendente.' });
+    await q('UPDATE support_tickets SET assigned_to=$1,assigned_email=$2,updated_at=$3 WHERE id=$4',
+      [req.user.id, req.user.email, Math.floor(Date.now()/1000), t.id]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// Staff: close ticket
+app.post('/api/support/tickets/:id/close', auth, role('creator','subdono','admin'), async (req,res) => {
+  try{
+    const now = Math.floor(Date.now()/1000);
+    await q('UPDATE support_tickets SET status=$1,closed_at=$2,updated_at=$3 WHERE id=$4',
+      ['closed', now, now, req.params.id]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// User: rate a closed ticket
+app.post('/api/support/tickets/:id/rate', auth, async (req,res) => {
+  try{
+    const { rating, comment } = req.body;
+    if(!rating || rating < 1 || rating > 5) return res.status(400).json({ error:'Rating 1-5 obrigatório.' });
+    const r = await q('SELECT * FROM support_tickets WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    const t = r.rows[0]; if(!t) return res.status(404).json({ error:'Não encontrado.' });
+    if(t.status !== 'closed') return res.status(400).json({ error:'Só é possível avaliar tickets encerrados.' });
+    await q('UPDATE support_tickets SET rating=$1,rating_comment=$2 WHERE id=$3', [rating, comment||'', t.id]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// Admin: support phone numbers (multiple)
+app.get('/api/admin/support-phones', auth, role('creator','subdono','admin'), async (req,res) => {
+  try{
+    const r = await q("SELECT value FROM config WHERE key='supportPhones'");
+    res.json(JSON.parse(r.rows[0]?.value||'[]'));
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+app.post('/api/admin/support-phones', auth, role('creator','subdono'), async (req,res) => {
+  try{
+    const { phones } = req.body; // array of {label, number}
+    await q("INSERT INTO config (key,value) VALUES ('supportPhones',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [JSON.stringify(phones)]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
+// Support stats for admin dashboard
+app.get('/api/support/stats', auth, role('creator','subdono','admin'), async (req,res) => {
+  try{
+    const open = await q("SELECT COUNT(*) FROM support_tickets WHERE status='open'");
+    const closed = await q("SELECT COUNT(*) FROM support_tickets WHERE status='closed'");
+    const avgRating = await q("SELECT ROUND(AVG(rating),1) as avg FROM support_tickets WHERE rating IS NOT NULL");
+    res.json({ open: parseInt(open.rows[0].count), closed: parseInt(closed.rows[0].count), avgRating: parseFloat(avgRating.rows[0].avg)||0 });
+  }catch(e){ res.status(500).json({ error:e.message }); }
 });
 
 app.get('*', (req,res) => res.sendFile(path.join(__dirname,'public','index.html')));
