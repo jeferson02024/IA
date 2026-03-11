@@ -136,13 +136,15 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .plus-btn:hover,.plus-btn.open{background:var(--accent);border-color:var(--accent);color:#000}
 .plus-btn svg{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
 .plus-btn.open svg{transform:rotate(45deg)}
-.plus-menu{position:absolute;bottom:calc(100% + 10px);left:0;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:50}
-.plus-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 14px;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);opacity:0;transform:translateY(12px) scale(.92);transition:opacity .22s,transform .22s,background .15s,border-color .15s;transition-delay:calc(var(--i) * 0.04s);pointer-events:none}
+.plus-menu{position:fixed;bottom:80px;left:16px;display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:200}
+.plus-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 14px;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);opacity:0;transform:translateY(12px) scale(.92);transition:opacity .22s,transform .22s,background .15s,border-color .15s;transition-delay:calc(var(--i) * 0.04s);pointer-events:none;box-shadow:0 4px 20px rgba(0,0,0,.5)}
 .plus-item:hover{background:var(--surface);border-color:var(--accent)}
 .plus-item-icon{font-size:18px;line-height:1}
 .plus-item-label{font-weight:500}
 .plus-menu.open .plus-item{opacity:1;transform:translateY(0) scale(1);pointer-events:all;transition-delay:calc((4 - var(--i)) * 0.05s)}
 .plus-item.mode-active{border-color:var(--accent);background:rgba(25,195,125,.08);color:var(--accent)}
+.plus-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;backdrop-filter:blur(2px)}
+.plus-backdrop.show{display:block}
 .mode-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(25,195,125,.1);border:1px solid rgba(25,195,125,.25);border-radius:20px;padding:3px 10px 3px 6px;font-size:12px;color:var(--accent);margin-bottom:6px;animation:badgeIn .25s cubic-bezier(.34,1.56,.64,1)}
 @keyframes badgeIn{from{opacity:0;transform:scale(.8) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
 .mode-badge-x{background:none;border:none;color:var(--accent);cursor:pointer;font-size:14px;padding:0;margin-left:2px;line-height:1}
@@ -223,13 +225,6 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
       <span class="search-icon">🔍</span>
       <input class="search-input" id="convSearch" placeholder="Buscar conversas..." oninput="filterConvs(this.value)">
     </div>
-    <div class="quick-modes" id="quickModes" style="padding:6px 12px 2px">
-      <button class="qmode active" data-mode="" onclick="setQuickMode(this,'')">✨ Normal</button>
-      <button class="qmode" data-mode="code" onclick="setQuickMode(this,'code')">💻 Código</button>
-      <button class="qmode" data-mode="write" onclick="setQuickMode(this,'write')">📝 Redação</button>
-      <button class="qmode" data-mode="fun" onclick="setQuickMode(this,'fun')">🎮 Diversão</button>
-      <button class="qmode" data-mode="analyze" onclick="setQuickMode(this,'analyze')">🧠 Análise</button>
-    </div>
     <div class="conv-list" id="convList"><div class="conv-empty">Nenhuma conversa ainda</div></div>
     <div class="sidebar-bottom">
       <div class="user-info" id="userInfo">Carregando...</div>
@@ -304,6 +299,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
   </div>
 </div>
 
+<div class="plus-backdrop" id="plusBackdrop" onclick="closePlusMenu()"></div>
 <!-- Settings Modal -->
 <div class="overlay" id="settingsOverlay" onclick="closeOut(event,'settingsOverlay')">
   <div class="modal">
@@ -1388,13 +1384,11 @@ function togglePlusMenu(){
   plusOpen = !plusOpen;
   document.getElementById('plusBtn').classList.toggle('open', plusOpen);
   document.getElementById('plusMenu').classList.toggle('open', plusOpen);
+  document.getElementById('plusBackdrop').classList.toggle('show', plusOpen);
   if(plusOpen){
-    // Update active state
     document.querySelectorAll('.plus-item[data-mode]').forEach(el=>{
       el.classList.toggle('mode-active', el.dataset.mode === activeQuickMode);
     });
-    // Close on outside click
-    setTimeout(()=>document.addEventListener('click', closePlusOutside, {once:true}), 10);
   }
 }
 
@@ -1406,6 +1400,7 @@ function closePlusMenu(){
   plusOpen = false;
   document.getElementById('plusBtn').classList.remove('open');
   document.getElementById('plusMenu').classList.remove('open');
+  document.getElementById('plusBackdrop').classList.remove('show');
 }
 
 function plusAction(action){
