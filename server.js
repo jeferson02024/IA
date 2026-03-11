@@ -795,6 +795,55 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', '.well-known', 'assetlinks.json'));
 });
 
+// ===== SHARED ROOMS =====
+const sharedRooms = new Map(); // code -> {participants:[], messages:[], createdAt}
+
+function genCode(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
+
+app.post('/api/shared-room', auth, async (req,res) => {
+  try{
+    const { action, code } = req.body;
+    const email = req.user.email;
+    if(action === 'create'){
+      const newCode = genCode();
+      sharedRooms.set(newCode, { participants:[email], messages:[], createdAt: Date.now() });
+      return res.json({ code: newCode });
+    }
+    if(action === 'join'){
+      const room = sharedRooms.get(code);
+      if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+      if(room.participants.length >= 2 && !room.participants.includes(email))
+        return res.status(400).json({ error: 'Sala cheia (máx 2 pessoas).' });
+      if(!room.participants.includes(email)) room.participants.push(email);
+      return res.json({ ok: true });
+    }
+    res.status(400).json({ error: 'Ação inválida.' });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/shared-room/:code/messages', auth, async (req,res) => {
+  try{
+    const room = sharedRooms.get(req.params.code);
+    if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const email = req.user.email;
+    if(!room.participants.includes(email)) room.participants.push(email);
+    res.json({ messages: room.messages, participants: room.participants.length });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/shared-room/:code/messages', auth, async (req,res) => {
+  try{
+    const room = sharedRooms.get(req.params.code);
+    if(!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+    const { text } = req.body;
+    if(!text) return res.status(400).json({ error: 'Texto vazio.' });
+    room.messages.push({ email: req.user.email, text, ts: Date.now() });
+    // Keep last 200 messages
+    if(room.messages.length > 200) room.messages = room.messages.slice(-200);
+    res.json({ ok: true });
+  }catch(e){ res.status(500).json({ error: e.message }); }
+});
+
 // Logo upload route
 app.post('/api/admin/logo', auth, role('creator','admin'), async (req,res) => {
   try {
