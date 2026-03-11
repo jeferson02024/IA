@@ -284,6 +284,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 
 <!-- Global Banner -->
 <div id="globalBanner" style="display:none;padding:10px 16px;font-size:13px;font-weight:500;text-align:center;position:sticky;top:0;z-index:90"></div>
+<div id="sidebarBackdrop" onclick="closeSidebar()" style="display:none;position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.5)"></div>
 <div class="toast-msg" id="toast"></div>
 
 <!-- Share Modal -->
@@ -649,7 +650,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\n1. SÓ use a tag ##IMG## se o usuário EXPLICITAMENTE pedir para CRIAR, GERAR ou DESENHAR uma imagem/foto/ilustração. Exemplo: "crie uma imagem de...", "gere uma foto de...", "desenhe...". Para qualquer outra mensagem, NUNCA use a tag ##IMG##.\n2. Quando gerar imagem: escreva uma frase curta em português e na mesma linha adicione ##IMG## descrição detalhada em inglês ##ENDIMG##.\n3. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown sem nenhum texto.\n4. NUNCA exiba a tag ##IMG## como texto visível ao usuário.\n5. Para saudações, perguntas e conversas normais, responda normalmente SEM nenhuma tag de imagem.'})
+      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:globalSystemPrompt||undefined})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
@@ -1357,10 +1358,15 @@ loadAppSettings();
 loadProfile();
 loadBannerAndChecks();
 
+// Global system prompt (loaded from server)
+let globalSystemPrompt = null;
+
 async function loadBannerAndChecks(){
   try{
     const r = await fetch('/api/app-config');
     const d = await r.json();
+    // Save global system prompt
+    globalSystemPrompt = d.systemPrompt || null;
     // Maintenance mode — redirect non-admins
     if(d.maintenance && me && me.role==='user'){
       document.body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0f0f0f;color:#fff;font-family:Inter,sans-serif;gap:14px;text-align:center;padding:20px">
