@@ -738,8 +738,14 @@ async function loadConversation(id){
     c.appendChild(badge);
   }
   conv.messages.forEach(m=>{
-    if(typeof m.content==='string') addMsg(m.role==='user'?'user':'ai',m.content,conv.provider);
-    else addMsgComplex(m.role==='user'?'user':'ai',m.content,conv.provider);
+    const content = typeof m.content === 'string' ? m.content : '';
+    if(content.startsWith('NEXIA_IMG:') || content.startsWith('NEXIA_IMG_URL:')){
+      renderImgMessage(content, conv.provider);
+    } else if(typeof m.content==='string') {
+      addMsg(m.role==='user'?'user':'ai',m.content,conv.provider);
+    } else {
+      addMsgComplex(m.role==='user'?'user':'ai',m.content,conv.provider);
+    }
   });
   c.scrollTop=c.scrollHeight;
   renderConvList();
@@ -1197,7 +1203,35 @@ async function generateImageFrontend(prompt, attempt=1){
   img.src = imgUrl;
 }
 
-function showGeneratedImage(imgUrl, attempt=1){
+async function saveImageToConversation(imgContent){
+  if(!currentConvId) return;
+  try {
+    await fetch(`/api/conversations/${currentConvId}/append-image`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ content: imgContent })
+    });
+  } catch(e){}
+}
+
+function renderImgMessage(content, prov){
+  const c = document.getElementById('messages');
+  const src = content.startsWith('NEXIA_IMG:') ? content.slice(10) : content.slice(14);
+  const safe = src.replace(/'/g,'%27');
+  const wrap = document.createElement('div');
+  wrap.className = `msg-row ai${prov?' '+prov:''}`;
+  wrap.innerHTML = `
+    <div class="msg-inner">
+      <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
+      <div class="msg-body">
+        <div class="gen-img-wrap">
+          <img src="${src}" class="gen-img" alt="imagem gerada" onclick="verImagemFullscreen('${safe}')" title="Toque para ampliar">
+          <button class="img-download-btn" onclick="baixarImagem('${safe}')">⬇️ Salvar imagem</button>
+        </div>
+      </div>
+    </div>`;
+  c.appendChild(wrap);
+}
   const msgs = document.getElementById('messages');
   // Remove existing loading div if retrying
   const existing = document.getElementById('img-loading');
@@ -1234,13 +1268,31 @@ function showGeneratedImage(imgUrl, attempt=1){
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${url}" class="gen-img" alt="imagem gerada" onclick="baixarImagem('${safeUrl}')" title="Toque para ampliar/salvar">
+            <img src="${url}" class="gen-img" alt="imagem gerada" onclick="verImagemFullscreen('${safeUrl}')" title="Toque para ampliar">
             <button class="img-download-btn" onclick="baixarImagem('${safeUrl}')">⬇️ Salvar imagem</button>
           </div>
         </div>
       </div>`;
     msgs.appendChild(wrap);
     msgs.scrollTop = msgs.scrollHeight;
+
+    // Salva imagem no histórico como base64 para persistir
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.naturalWidth || 512;
+      canvas.height = img.naturalHeight || 512;
+      ctx.drawImage(img, 0, 0);
+      const b64 = canvas.toDataURL('image/jpeg', 0.85);
+      // Adiciona ao histórico como marcador especial
+      history.push({role:'assistant', content: 'NEXIA_IMG:' + b64});
+      // Salva na conversa do servidor
+      if(currentConvId) saveImageToConversation('NEXIA_IMG:' + b64);
+    } catch(e) {
+      // CORS: salva URL como fallback
+      history.push({role:'assistant', content: 'NEXIA_IMG_URL:' + url});
+      if(currentConvId) saveImageToConversation('NEXIA_IMG_URL:' + url);
+    }
   };
   img.onerror = () => {
     clearTimeout(timeout);
@@ -1254,16 +1306,42 @@ function showGeneratedImage(imgUrl, attempt=1){
   img.src = url;
 }
 
-function baixarImagem(url){
-  // Cria overlay fullscreen com a imagem para salvar
+function verImagemFullscreen(url){
   const overlay = document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+  overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
   overlay.innerHTML = `
-    <p style="color:#fff;font-family:sans-serif;font-size:14px;margin:0 0 12px;text-align:center;padding:0 20px">📥 Pressione e segure na imagem para salvar</p>
-    <img src="${url}" style="max-width:100vw;max-height:80vh;object-fit:contain;border-radius:8px"/>
-    <button onclick="this.parentNode.remove()" style="margin-top:16px;background:#333;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:15px;cursor:pointer">✕ Fechar</button>
-  `;
+    <img src="${url}" style="max-width:96vw;max-height:80vh;object-fit:contain;border-radius:10px"/>
+    <div style="display:flex;gap:12px;margin-top:16px">
+      <button onclick="baixarImagem('${url}')" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer">⬇️ Salvar</button>
+      <button onclick="this.closest('div[style]').remove()" style="background:#333;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer">✕ Fechar</button>
+    </div>`;
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
   document.body.appendChild(overlay);
+}
+
+function baixarImagem(url){
+  // Se for base64, baixa direto
+  if(url.startsWith('data:')){
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nexia-imagem.jpg';
+    a.click();
+    return;
+  }
+  // URL externa: tenta fetch para download direto
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'nexia-imagem.jpg';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    })
+    .catch(() => {
+      // Fallback: abre em nova aba para salvar manualmente
+      window.open(url, '_blank');
+    });
 }
 
 async function downloadImage(url, filename){
