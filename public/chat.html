@@ -205,6 +205,10 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .toast-msg.show{display:block}
 .toast-msg.ok{border-color:rgba(25,195,125,.4);color:var(--accent)}
 .toast-msg.err{border-color:rgba(239,68,68,.4);color:#fca5a5}
+.gen-img-wrap{display:flex;flex-direction:column;gap:8px;max-width:260px}
+.gen-img{width:100%;max-width:260px;height:260px;object-fit:cover;border-radius:12px;cursor:pointer;border:1px solid var(--border);display:block}
+.img-download-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 0;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;width:100%;text-align:center}
+.img-download-btn:hover{background:var(--border)}
 </style>
 </head>
 <body>
@@ -1230,7 +1234,7 @@ function showGeneratedImage(imgUrl, attempt=1){
         <div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div>
         <div class="msg-body">
           <div class="gen-img-wrap">
-            <img src="${url}" class="gen-img" alt="imagem gerada">
+            <img src="${url}" class="gen-img" alt="imagem gerada" onclick="baixarImagem('${safeUrl}')" title="Toque para ampliar/salvar">
             <button class="img-download-btn" onclick="baixarImagem('${safeUrl}')">⬇️ Salvar imagem</button>
           </div>
         </div>
