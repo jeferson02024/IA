@@ -351,8 +351,11 @@ app.post('/api/chat', auth, async (req,res) => {
     let systemPrompt = clientSystemPrompt;
     if (!systemPrompt) {
       const sp = await q("SELECT value FROM config WHERE key='systemPrompt'");
-      systemPrompt = sp.rows[0]?.value || 'Você é Nexia, assistente de IA. Responda sempre em português. REGRAS OBRIGATÓRIAS:\n1. SÓ use a tag ##IMG## se o usuário EXPLICITAMENTE pedir para CRIAR, GERAR ou DESENHAR uma imagem/foto/ilustração. Para qualquer outra mensagem, NUNCA use ##IMG##.\n2. Quando gerar imagem: escreva uma frase curta em português e adicione ##IMG## descrição detalhada em inglês ##ENDIMG##.\n3. SITE/APP/PROJETO/CÓDIGO/ZIP: responda SOMENTE com blocos de código markdown.\n4. NUNCA exiba a tag ##IMG## como texto visível.\n5. Para conversas normais, responda normalmente SEM tags de imagem.';
+      systemPrompt = sp.rows[0]?.value || 'Você é Nexia, assistente de IA. Responda sempre em português.';
     }
+    // Always append image generation rules
+    const imageRules = '\n\nREGRAS DE IMAGEM (OBRIGATÓRIO):\n1. SÓ use a tag ##IMG## se o usuário EXPLICITAMENTE pedir para CRIAR, GERAR ou DESENHAR uma imagem/foto/ilustração.\n2. Quando gerar imagem: escreva uma frase curta em português e adicione ##IMG## descrição detalhada em inglês ##ENDIMG##.\n3. NUNCA exiba a tag ##IMG## como texto visível.\n4. Para conversas normais, responda normalmente SEM tags de imagem.';
+    if (!systemPrompt.includes('##IMG##')) systemPrompt += imageRules;
 
     // Sanitize messages
     const messages = (rawMessages||[]).map(m => {
