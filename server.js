@@ -441,7 +441,6 @@ app.post('/api/chat', auth, async (req,res) => {
     let imagePrompt = null;
     let cleanReply = reply;
 
-    // Só gera imagem se a IA retornou a tag ##IMG## explicitamente
     const patterns = [
       /##IMG##([\s\S]+?)##ENDIMG##/i,
       /\[GERAR_IMAGEM:\s*([\s\S]+?)\]/i,
@@ -452,10 +451,18 @@ app.post('/api/chat', auth, async (req,res) => {
       const m = reply.match(pat);
       if (m) {
         imagePrompt = m[1].trim();
-        cleanReply = reply.replace(pat, '').trim();
         break;
       }
     }
+    // Limpa TODOS os resíduos de tags de imagem do reply
+    cleanReply = reply
+      .replace(/##IMG##[\s\S]*?##ENDIMG##/gi, '')
+      .replace(/##IMG##[\s\S]*/gi, '')       // tag sem fechamento
+      .replace(/##ENDIMG##/gi, '')           // endimg solto
+      .replace(/\[GERAR_IMAGEM:[^\]]*\]/gi, '')
+      .replace(/\[GENERATE_IMAGE:[^\]]*\]/gi, '')
+      .replace(/\[IMAGE:[^\]]*\]/gi, '')
+      .trim();
 
     if (imagePrompt) {
       const shortPrompt = imagePrompt.slice(0, 300);
@@ -615,7 +622,7 @@ app.get('/api/admin/config', auth, role('creator','admin'), async (req,res) => {
       togetherKeyMasked: cfg.global_together_key?cfg.global_together_key.slice(0,8)+'••••':null, hasTogetherKey:!!cfg.global_together_key,
       theme: { accent: cfg.theme_accent||'#19c37d', bg: cfg.theme_bg||'#0f0f0f', sidebar: cfg.theme_sidebar||'#171717', surface: cfg.theme_surface||'#1e1e1e' },
       hasCfToken: !!cfg.cf_api_token, cfTokenMasked: cfg.cf_api_token?cfg.cf_api_token.slice(0,8)+'••••':null,
-      hasCfAccount: !!cfg.cf_account_id,
+      hasCfAccount: !!cfg.cf_account_id, cfAccountMasked: cfg.cf_account_id?cfg.cf_account_id.slice(0,8)+'...':null,
       personalityMode: cfg.personalityMode||'padrao',
       systemPrompt: cfg.systemPrompt||'',
       customPrompt: cfg.customPrompt||'',
@@ -1294,22 +1301,44 @@ app.post('/api/generate-image', auth, async (req,res) => {
   try {
     const { prompt } = req.body;
     if(!prompt) return res.status(400).json({ error:'prompt obrigatório.' });
+
+    // Tenta Cloudflare primeiro se configurado
     const cfAccRow = await q("SELECT value FROM config WHERE key='cf_account_id'");
     const cfTokRow = await q("SELECT value FROM config WHERE key='cf_api_token'");
     const CF_ACCOUNT = cfAccRow.rows[0]?.value;
     const CF_TOKEN = cfTokRow.rows[0]?.value;
-    if(!CF_ACCOUNT || !CF_TOKEN) return res.status(503).json({ error:'Cloudflare não configurado.' });
-    const cfRes = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
-      { method:'POST', headers:{ 'Authorization':`Bearer ${CF_TOKEN}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({ prompt: prompt.slice(0,300) }),
-        signal: AbortSignal.timeout(30000) }
-    );
-    if(!cfRes.ok){ const e=await cfRes.text(); return res.status(502).json({ error:'Cloudflare erro: '+e.slice(0,100) }); }
-    const buf = await cfRes.arrayBuffer();
+    if(CF_ACCOUNT && CF_TOKEN){
+      try {
+        const cfRes = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+          { method:'POST', headers:{ 'Authorization':`Bearer ${CF_TOKEN}`, 'Content-Type':'application/json' },
+            body: JSON.stringify({ prompt: prompt.slice(0,300) }),
+            signal: AbortSignal.timeout(30000) }
+        );
+        if(cfRes.ok){
+          const buf = await cfRes.arrayBuffer();
+          const b64 = Buffer.from(buf).toString('base64');
+          return res.json({ imageUrl: `data:image/png;base64,${b64}` });
+        }
+      } catch(e){ console.log('[img] Cloudflare falhou:', e.message); }
+    }
+
+    // Fallback: Pollinations via backend (sem CORS)
+    const seed = Math.floor(Math.random()*99999);
+    const enc = encodeURIComponent(prompt.slice(0,400));
+    const polUrl = `https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${seed}&model=flux`;
+    console.log('[img] Tentando Pollinations:', polUrl.slice(0,80));
+    const polRes = await fetch(polUrl, { signal: AbortSignal.timeout(45000) });
+    if(!polRes.ok) throw new Error('Pollinations retornou ' + polRes.status);
+    const buf = await polRes.arrayBuffer();
     const b64 = Buffer.from(buf).toString('base64');
-    res.json({ imageUrl: `data:image/png;base64,${b64}` });
-  } catch(e){ res.status(500).json({ error:e.message }); }
+    const ct = polRes.headers.get('content-type') || 'image/jpeg';
+    return res.json({ imageUrl: `data:${ct};base64,${b64}` });
+
+  } catch(e){
+    console.error('[img] Erro:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ===== SUPPORT TICKETS =====
