@@ -1232,8 +1232,9 @@ function renderImgMessage(content, prov){
     </div>`;
   c.appendChild(wrap);
 }
+
+function showGeneratedImage(imgUrl, attempt=1){
   const msgs = document.getElementById('messages');
-  // Remove existing loading div if retrying
   const existing = document.getElementById('img-loading');
   if(existing) existing.remove();
 
