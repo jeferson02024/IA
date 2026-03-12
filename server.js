@@ -1289,6 +1289,29 @@ app.post('/api/conversations/:id/append-image', auth, async (req,res) => {
   }catch(e){ res.status(500).json({ error:e.message }); }
 });
 
+// Dedicated image generation endpoint
+app.post('/api/generate-image', auth, async (req,res) => {
+  try {
+    const { prompt } = req.body;
+    if(!prompt) return res.status(400).json({ error:'prompt obrigatório.' });
+    const cfAccRow = await q("SELECT value FROM config WHERE key='cf_account_id'");
+    const cfTokRow = await q("SELECT value FROM config WHERE key='cf_api_token'");
+    const CF_ACCOUNT = cfAccRow.rows[0]?.value;
+    const CF_TOKEN = cfTokRow.rows[0]?.value;
+    if(!CF_ACCOUNT || !CF_TOKEN) return res.status(503).json({ error:'Cloudflare não configurado.' });
+    const cfRes = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0`,
+      { method:'POST', headers:{ 'Authorization':`Bearer ${CF_TOKEN}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ prompt: prompt.slice(0,300) }),
+        signal: AbortSignal.timeout(30000) }
+    );
+    if(!cfRes.ok){ const e=await cfRes.text(); return res.status(502).json({ error:'Cloudflare erro: '+e.slice(0,100) }); }
+    const buf = await cfRes.arrayBuffer();
+    const b64 = Buffer.from(buf).toString('base64');
+    res.json({ imageUrl: `data:image/png;base64,${b64}` });
+  } catch(e){ res.status(500).json({ error:e.message }); }
+});
+
 // ===== SUPPORT TICKETS =====
 
 // User: open a ticket
