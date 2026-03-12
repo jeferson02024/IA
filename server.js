@@ -357,8 +357,11 @@ app.post('/api/chat', auth, async (req,res) => {
     const imageRules = '\n\nREGRAS DE IMAGEM (OBRIGATÓRIO):\n1. SÓ use a tag ##IMG## se o usuário EXPLICITAMENTE pedir para CRIAR, GERAR ou DESENHAR uma imagem/foto/ilustração.\n2. Quando gerar imagem: escreva uma frase curta em português e adicione ##IMG## descrição detalhada em inglês ##ENDIMG##.\n3. NUNCA exiba a tag ##IMG## como texto visível.\n4. Para conversas normais, responda normalmente SEM tags de imagem.';
     if (!systemPrompt.includes('##IMG##')) systemPrompt += imageRules;
 
-    // Sanitize messages
-    const messages = (rawMessages||[]).map(m => {
+    // Sanitize messages - remove imagens base64 do histórico antes de enviar para IA
+    const messages = (rawMessages||[]).filter(m => {
+      const c = typeof m.content === 'string' ? m.content : '';
+      return !c.startsWith('NEXIA_IMG:') && !c.startsWith('NEXIA_IMG_URL:');
+    }).map(m => {
       if (Array.isArray(m.content)) {
         const textParts = m.content.filter(p => p.type === 'text').map(p => p.text).join(' ');
         return { ...m, content: textParts || '[imagem]' };
