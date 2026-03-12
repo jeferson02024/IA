@@ -1271,6 +1271,21 @@ app.get('/api/support/phones-public', async (req,res) => {
   }catch(e){ res.status(500).json({ error:e.message }); }
 });
 
+// Append image message to conversation
+app.post('/api/conversations/:id/append-image', auth, async (req,res) => {
+  try{
+    const { content } = req.body;
+    if(!content) return res.status(400).json({ error:'content obrigatório.' });
+    const r = await q('SELECT * FROM conversations WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if(!r.rows.length) return res.status(404).json({ error:'Não encontrado.' });
+    const msgs = JSON.parse(r.rows[0].messages||'[]');
+    msgs.push({ role:'assistant', content });
+    await q('UPDATE conversations SET messages=$1,updated_at=$2 WHERE id=$3',
+      [JSON.stringify(msgs), Math.floor(Date.now()/1000), req.params.id]);
+    res.json({ ok:true });
+  }catch(e){ res.status(500).json({ error:e.message }); }
+});
+
 // ===== SUPPORT TICKETS =====
 
 // User: open a ticket
