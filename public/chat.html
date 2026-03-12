@@ -1150,7 +1150,7 @@ function showTyping(){
   c.appendChild(d);c.scrollTop=c.scrollHeight;return id;
 }
 
-async function generateImageFrontend(prompt, attempt=1){
+async function generateImageFrontend(prompt){
   const msgs = document.getElementById('messages');
   let loadDiv = document.getElementById('imgLoadDiv');
   if(!loadDiv){
@@ -1159,64 +1159,22 @@ async function generateImageFrontend(prompt, attempt=1){
     loadDiv.innerHTML = `<div class="msg-inner"><div class="msg-av"><img src="/logo.png" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></div><div class="msg-body"><p>🎨 Gerando imagem...</p></div></div>`;
     msgs.appendChild(loadDiv); msgs.scrollTop = msgs.scrollHeight;
   }
-
-  // Tenta via backend (Cloudflare) primeiro
   try {
     const r = await fetch('/api/generate-image', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({prompt})
     });
+    document.getElementById('imgLoadDiv')?.remove();
     if(r.ok){
       const d = await r.json();
-      if(d.imageUrl){
-        loadDiv.remove();
-        showGeneratedImage(d.imageUrl, prompt);
-        return;
-      }
+      if(d.imageUrl){ showGeneratedImage(d.imageUrl, prompt); return; }
     }
-  } catch(e){}
-
-  // Fallback: Pollinations
-  const seed = Math.floor(Math.random()*99999);
-  const enc = encodeURIComponent(prompt);
-  const urls = [
-    `https://image.pollinations.ai/prompt/${enc}?width=512&height=512&nologo=true&seed=${seed}`,
-    `https://image.pollinations.ai/prompt/${enc}?model=flux&width=512&height=512&nologo=true&seed=${seed}`,
-    `https://image.pollinations.ai/prompt/${enc}?model=turbo&width=512&height=512&nologo=true&seed=${seed}`,
-    `https://image.pollinations.ai/prompt/${enc}?model=flux-schnell&width=512&height=512&nologo=true&seed=${seed+1}`,
-  ];
-  const imgUrl = urls[(attempt-1) % urls.length];
-  if(loadDiv.querySelector('p')) loadDiv.querySelector('p').textContent = `🎨 Tentativa ${attempt}/4 via Pollinations...`;
-
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  const timer = setTimeout(()=>{
-    img.src = '';
-    if(attempt < 4){
-      generateImageFrontend(prompt, attempt+1);
-    } else {
-      loadDiv.remove();
-      document.getElementById('imgLoadDiv')?.remove();
-      addMsgStreaming('ai','❌ Não consegui gerar a imagem. Configure o Cloudflare AI no admin.',provider);
-    }
-  }, 35000);
-
-  img.onload = ()=>{
-    clearTimeout(timer);
+    addMsgStreaming('ai','❌ Não consegui gerar a imagem. Tente novamente.',provider);
+  } catch(e){
     document.getElementById('imgLoadDiv')?.remove();
-    showGeneratedImage(imgUrl, prompt);
-  };
-  img.onerror = ()=>{
-    clearTimeout(timer);
-    if(attempt < 4){
-      generateImageFrontend(prompt, attempt+1);
-    } else {
-      document.getElementById('imgLoadDiv')?.remove();
-      addMsgStreaming('ai','❌ Não consegui gerar a imagem.',provider);
-    }
-  };
-  img.src = imgUrl;
+    addMsgStreaming('ai','❌ Erro ao gerar imagem: '+e.message, provider);
+  }
 }
 
 async function saveImageToConversation(imgContent){

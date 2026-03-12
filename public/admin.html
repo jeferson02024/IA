@@ -428,6 +428,7 @@ input::placeholder{color:var(--muted)}
             <div><div class="api-card-title">Cloudflare AI</div><div class="api-card-sub">Geração de imagens · Grátis</div></div>
           </div>
           <div class="key-status"><div class="kdot" id="cfDot" style="background:#333"></div><span id="cfInfo">Verificando...</span></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="cfAccInfo"></div>
           <div class="field"><label>Account ID</label><input type="text" id="cfAccountInput" placeholder="c7dc19a209cbcf..."/></div>
           <div class="field"><label>API Token</label><input type="password" id="cfTokenInput" placeholder="Cole o token do Cloudflare..."/></div>
           <button class="btn-save" style="background:#f97316;color:#fff" onclick="saveCF()">Salvar Cloudflare</button>
@@ -1479,8 +1480,10 @@ async function loadConfig() {
   // Cloudflare status
   const cfDot = document.getElementById('cfDot');
   const cfInfo = document.getElementById('cfInfo');
-  if(cfDot){ cfDot.style.background=d.hasCfToken?'#f97316':'#333'; cfDot.style.boxShadow=d.hasCfToken?'0 0 6px #f97316':'none'; }
-  if(cfInfo) cfInfo.textContent = d.hasCfToken ? '✅ '+d.cfTokenMasked : 'Nenhuma key configurada';
+  const cfAccInfo = document.getElementById('cfAccInfo');
+  if(cfDot){ cfDot.style.background=(d.hasCfToken&&d.hasCfAccount)?'#f97316':'#333'; cfDot.style.boxShadow=(d.hasCfToken&&d.hasCfAccount)?'0 0 6px #f97316':'none'; }
+  if(cfInfo) cfInfo.textContent = d.hasCfToken ? '✅ Token: '+d.cfTokenMasked : '❌ Token não configurado';
+  if(cfAccInfo) cfAccInfo.textContent = d.hasCfAccount ? '✅ Account: '+d.cfAccountMasked : '❌ Account ID não configurado';
 
   if(d.groqModel) document.getElementById('groqModel').value=d.groqModel;
   if(d.geminiModel) document.getElementById('geminiModel').value=d.geminiModel;
@@ -1525,11 +1528,8 @@ async function saveMistral(){
 async function saveCF(){
   const cfAccountId = document.getElementById('cfAccountInput').value.trim();
   const cfApiToken = document.getElementById('cfTokenInput').value.trim();
-  if(!cfAccountId && !cfApiToken) return toast('Preencha o Account ID e/ou Token.','err');
-  const body = {};
-  if(cfAccountId) body.cfAccountId = cfAccountId;
-  if(cfApiToken) body.cfApiToken = cfApiToken;
-  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!cfAccountId || !cfApiToken) return toast('Preencha o Account ID E o API Token.','err');
+  const r = await fetch('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cfAccountId, cfApiToken})});
   if(!r.ok) return toast('Erro ao salvar.','err');
   document.getElementById('cfAccountInput').value='';
   document.getElementById('cfTokenInput').value='';
