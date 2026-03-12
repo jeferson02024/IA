@@ -964,7 +964,7 @@ async function send(){
     const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({messages:history,provider,model,conversationId:currentConvId,systemPrompt:(globalSystemPrompt||'')+getMemoryPrompt()||undefined})
+      body:JSON.stringify({messages:history.filter(m=>!String(m.content||'').startsWith('NEXIA_IMG')),provider,model,conversationId:currentConvId,systemPrompt:(globalSystemPrompt||'')+getMemoryPrompt()||undefined})
     });
     const d=await r.json();
     document.getElementById(tid)?.remove();
