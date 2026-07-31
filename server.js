@@ -94,7 +94,20 @@ async function initDB() {
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
-  await q(`ALTER TABLE users ALTER COLUMN username DROP NOT NULL`).catch(()=>{});
+  // Corrige automaticamente colunas legadas com NOT NULL que sobraram de versões antigas
+  // do schema (ex: username, password_hash) e que o código atual não preenche mais.
+  try {
+    const knownCols = ['id','email','password','role','personal_groq_key','personal_gemini_key',
+      'personal_mistral_key','personal_openrouter_key','personal_deepseek_key','created_at','last_seen'];
+    const cols = await q(`SELECT column_name FROM information_schema.columns
+      WHERE table_name='users' AND is_nullable='NO' AND column_default IS NULL`);
+    for (const row of cols.rows) {
+      if (!knownCols.includes(row.column_name)) {
+        await q(`ALTER TABLE users ALTER COLUMN "${row.column_name}" DROP NOT NULL`).catch(()=>{});
+        console.log(`[db] removida constraint NOT NULL legada da coluna: ${row.column_name}`);
+      }
+    }
+  } catch(e) { console.error('[db] erro ao limpar colunas legadas:', e.message); }
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
   await q(`CREATE TABLE IF NOT EXISTS shared_rooms (
     code TEXT PRIMARY KEY,
