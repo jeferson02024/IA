@@ -93,6 +93,7 @@ async function initDB() {
     personal_mistral_key TEXT, personal_openrouter_key TEXT, personal_deepseek_key TEXT,
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
+  await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
   await q(`CREATE TABLE IF NOT EXISTS shared_rooms (
     code TEXT PRIMARY KEY,
