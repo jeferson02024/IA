@@ -94,6 +94,7 @@ async function initDB() {
     created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())
   )`);
   await q(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
+  await q(`ALTER TABLE users ALTER COLUMN username DROP NOT NULL`).catch(()=>{});
   await q(`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)`);
   await q(`CREATE TABLE IF NOT EXISTS shared_rooms (
     code TEXT PRIMARY KEY,
